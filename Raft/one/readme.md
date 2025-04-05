@@ -51,3 +51,18 @@ The primary goal of Raft is to achieve consensus among nodes in the cluster rega
 -   This ensures that the operation is officially part of the system's state and will be applied consistently across all nodes.
 
 Additionally, the leader regularly sends updates to the other servers to keep them in sync. This ensures that even if a server falls behind or crashes, it can quickly catch up with the latest state of the key-value store.
+
+
+
+-------
+
+Used in Production
+==================
+
+The Raft algorithm has been adopted by several popular distributed systems for ensuring reliability and consistency. Some notable systems that use Raft include:
+
+-   **Apache Kafka:** Kafka, a distributed streaming platform, employs Raft for managing metadata and coordinating brokers in the cluster.
+-   **ScyllaDB:** ScyllaDB, a high-performance NoSQL database, utilizes Raft for leader election and coordination among nodes for consistency and fault tolerance.
+-   **etcd:** etcd is a distributed key-value store used for configuration management, service discovery, and coordination. It relies on Raft for distributed consensus to ensure consistency and fault tolerance.
+-   **TiKV:** TiKV is a distributed transactional key-value database built to support the TiDB distributed SQL database. It uses Raft for distributed coordination and replication of data across nodes.
+-   **Consul:** Consul is a service mesh and service discovery tool that provides key-value storage for configuration, health checking, and distributed coordination. It employs Raft for consensus among nodes in a Consul cluster.
