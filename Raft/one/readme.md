@@ -34,3 +34,20 @@ The primary goal of Raft is to achieve consensus among nodes in the cluster rega
 -   The leader accepts client requests and appends them to its log.
 -   It then sends the log entry to followers, which replicate the log entry.
 -   Once a majority of followers acknowledge the entry, it's committed to the log and applied to the state machine.
+
+
+---------------------
+
+1.  **Log Replication:**
+
+-   When a client initiates an operation, such as setting a key-value pair, the leader node receives the request.
+-   The leader appends the operation to its log and broadcasts this log entry to all other nodes in the cluster, including peer nodes.
+-   Each node in the cluster appends the log entry to its log.
+
+2. **Majority Agreement:**
+
+-   Raft operates on the principle of majority agreement. Before committing an operation to its state machine, the leader node waits for acknowledgments from most nodes.
+-   If most of the nodes(`Say N/2 + 1`) acknowledge the operation by replicating it in their logs, the leader commits the operation to its state machine.
+-   This ensures that the operation is officially part of the system's state and will be applied consistently across all nodes.
+
+Additionally, the leader regularly sends updates to the other servers to keep them in sync. This ensures that even if a server falls behind or crashes, it can quickly catch up with the latest state of the key-value store.
