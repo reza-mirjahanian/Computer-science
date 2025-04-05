@@ -27,3 +27,10 @@ The primary goal of Raft is to achieve consensus among nodes in the cluster rega
 -   If a follower doesn't hear from the leader for a certain period (election timeout), it transitions to the candidate state.
 -   The candidate requests votes from other nodes. If it receives votes from the majority, it becomes the leader.
 -   If no node receives a majority, a new election is started in the next term.
+
+
+**Log Replication and Consistency:**
+
+-   The leader accepts client requests and appends them to its log.
+-   It then sends the log entry to followers, which replicate the log entry.
+-   Once a majority of followers acknowledge the entry, it's committed to the log and applied to the state machine.
