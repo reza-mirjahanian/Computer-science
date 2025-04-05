@@ -71,6 +71,7 @@
 ### **Leader Election:**
 1. **Initial State:**  
    - All nodes start as **followers**.  
+   ![alt text](image.png)
 2. **Election Process:**  
    - If no leader is heard, a node switches to **candidate** status.  
    - Candidates request votes from followers.  
@@ -86,6 +87,7 @@
 ---
 
 ## **Log Replication**
+![alt text](image-1.png)
 ### **Process:**
 1. **Leader writes to its log.**  
 2. **Replicates entries to followers** via append entries RPC.  
