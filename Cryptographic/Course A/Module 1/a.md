@@ -74,6 +74,7 @@
 ---
 
 ## **Real-World Example**
+![alt text](image-2.png)
 - **Scenario**:
   - Accessing a website using HTTPS (e.g., technosurge.com).
   - HTTPS ensures encryption and authenticity through certificates.
