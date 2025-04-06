@@ -1,5 +1,5 @@
 ### **Cryptographic Keys & Key Length**  
-
+![alt text](image.png)
 #### **Requirements for Encryption**  
 To create **cipher text**, you need:  
 1. **Plain text** (original message).  
