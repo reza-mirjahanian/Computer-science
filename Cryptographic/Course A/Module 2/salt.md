@@ -1,5 +1,5 @@
 ### **Hashing, Salting, Peppering, and Key Stretching**  
-
+![alt text](image-5.png)
 #### **Scenario Setup**  
 - A database contains a table with **usernames and passwords**.  
 - Passwords are stored as **hashes** (not plaintext) using a hashing algorithm.  
