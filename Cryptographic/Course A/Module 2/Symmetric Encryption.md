@@ -15,6 +15,7 @@
 | **Padding** | May require padding to fill block size. | No padding needed. |
 | **Examples** | AES, DES, Blowfish, Twofish. | RC4, ChaCha20. |
 
+![alt text](image-6.png)
 #### **3\. Block Ciphers in Detail**
 
 -   **Block Size**:
