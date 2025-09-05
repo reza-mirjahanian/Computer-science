@@ -45,3 +45,14 @@ The greatest barrier to large-scale DKG deployment is its *communication and com
 
 https://github.com/PhilippSchindler/EthDKG
 
+
+**How DKG Works**
+-----------------
+
+1.  **Initialization**: Each participant independently generates a share of a random secret.
+
+2.  **Share Exchange**: Participants securely share their secret shares with others in the group.
+
+3.  **Aggregation**: The group combines all contributions using cryptographic algorithms to produce a public key and individual private key shares.
+
+4.  **Threshold Operations**: Any subset of participants that meets or exceeds the threshold can perform cryptographic operations (e.g., signing a message) without needing to reconstruct the full private key
