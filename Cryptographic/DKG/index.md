@@ -41,3 +41,7 @@ However, **asynchronous protocols often come with significant *computation and b
 ### Scalability Challenges
 
 The greatest barrier to large-scale DKG deployment is its *communication and computation intensity*. Classical DKG protocols require all participants to share, verify, and cross-validate polynomial commitments and shares with every other party (a quadratic O(n²) or even cubic O(n³) pattern). As validator sets in production blockchains grow to hundreds or thousands of nodes, naive DKG becomes impractically slow and bandwidth-intensive.
+
+
+https://github.com/PhilippSchindler/EthDKG
+

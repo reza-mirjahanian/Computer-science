@@ -284,7 +284,3 @@ Key research avenues include:
 - **Interdisciplinary Integration**: Associates DKG with advances in zero-knowledge proofs (for privacy-preserving DKG), distributed randomness, and secure multiparty computation for fair collaborative computation beyond just key management.
 
 ---
-
-## Conclusion
-
-Distributed Key Generation stands at the nexus of cryptographic innovation and blockchain-driven decentralization. By enabling secure, robust, and truly decentralized key management, DKG supports the emerging infrastructure of Web3, powering consensus, custody, cross-chain interoperability, and advanced DeFi applications without reliance on centralized trust. As platforms scale, protocols evolve, and adversaries grow more sophisticated, continued research and sophisticated engineering in DKG will remain a linchpin for the reliable, secure, and permissionless blockchain systems of the future.
