@@ -1,0 +1,31 @@
+## Interactive vs. Non-Interactive MPC Wallets: A Deep Dive
+
+### Concise Answer
+
+The fundamental distinction between interactive and non-interactive protocols in the context of Multi-Party Computation (MPC) wallets lies in the communication requirements during the cryptographic processes, primarily **Distributed Key Generation (DKG)** and **Threshold Signature Schemes (TSS)**.
+
+**Interactive MPC wallets** necessitate multiple, real-time rounds of communication between the participating parties (devices or servers holding key shares) to generate a key or sign a transaction. This synchronous communication model requires all participants to be online and responsive simultaneously. The primary drawback is increased latency and potential for process failure if any party is offline or experiences network issues.
+
+**Non-interactive MPC wallets**, in contrast, leverage cryptographic protocols that significantly reduce or eliminate the need for simultaneous interaction. In a purely non-interactive model, a party can perform its portion of the computation independently and broadcast a single message. More practically, many modern MPC wallets employ a **non-interactive signing phase**, where initial, communication-heavy "pre-signing" rounds can be completed offline and asynchronously. The final signing round then requires minimal, often non-interactive, participation. This asynchronous approach enhances user experience by reducing transaction times and removing the strict requirement for all parties to be concurrently online.
+
+---
+
+### Detailed Explanation
+
+In the ever-evolving landscape of digital asset security, a silent but significant architectural battle is being waged within the cryptographic protocols that power Multi-Party Computation (MPC) wallets. This is the story of two paradigms: the demanding, synchronous world of **interactive** protocols and the flexible, asynchronous realm of their **non-interactive** counterparts.
+
+Imagine a high-stakes council of ancient mages, each guarding a fragment of a powerful secret key. To cast a spell (sign a transaction), they must convene and perform a complex, synchronized ritual. In the world of **interactive** MPC, this is precisely how early protocols functioned. When a transaction needed to be signed, each mage (or device holding a key share) had to be present and actively participate in a multi-step, back-and-forth exchange of cryptographic messages. If one mage was delayed by a storm (network latency) or simply unavailable, the entire ritual would grind to a halt. This is the essence of an **interactive** protocol: a conversational process where each step is contingent on the immediate response of others.
+
+> **Interactive Protocol:** A cryptographic protocol where two or more parties must engage in multiple rounds of message exchange to complete a computation. The protocol's progression is contingent on the timely and correct responses of all participants within each round, creating a synchronous dependency. This is formally modeled in computational complexity theory as an interactive proof system.
+>
+> **Distributed Key Generation (DKG):** A cryptographic protocol in which a set of parties jointly generate a shared public and private key pair without any single party ever holding the entire private key. Each party holds only a share of the private key. This process is fundamental to MPC wallets, ensuring no single point of compromise for the key.
+>
+> **Threshold Signature Scheme (TSS):** A cryptographic scheme that allows a group of parties, where each holds a share of a private key, to collectively sign a message. A valid signature can only be generated if a minimum number, or threshold, of parties cooperate. The full private key is never reconstructed during this process.
+
+Now, picture a new generation of mages who have refined their craft. They've developed a method where much of the complex ritual can be prepared in advance, individually, and at their own leisure. This is the world of **non-interactive** MPC. Each mage can perform the preliminary steps of the spell—the "pre-signing" ceremony—on their own time. When the moment comes to cast the spell, they each present their prepared component, and a signature is formed with minimal or no further discussion.
+
+This evolution mirrors the advancements in MPC wallet technology. Modern protocols, while not entirely devoid of interaction, have shifted the bulk of the communication to an offline, asynchronous "pre-computation" phase. When a user wishes to make a transaction, the final signing step is swift and requires significantly less back-and-forth. This is the hallmark of a **non-interactive** or, more accurately, a *less interactive* signing process. The advantage is a dramatically improved user experience—faster transaction approvals and the ability for parties to participate without being perfectly synchronized. A truly **non-interactive** protocol would be the cryptographic equivalent of each party sending a single, self-contained message to a central point to form the signature, a feat achieved in some advanced schemes through sophisticated cryptographic primitives.
+
+> **Non-Interactive Protocol:** A cryptographic protocol where a party can generate a proof or a signature share in a single message, without requiring a multi-round conversation with other participants. In the context of MPC wallets, this often refers to protocols where the online signing phase is non-interactive, relying on pre-computed data from an earlier, potentially interactive, setup phase. This is often achieved using techniques like the Fiat-Shamir heuristic to convert an interactive proof into a non-interactive one.
+>
+> **Asynchronous Protocol:** In the context of distributed computing and cryptography, an asynchronous protocol is one that does not rely on assumptions about the timing of message delivery or the synchronized execution of steps by different parties. Participants can proceed with their computations as soon as they receive the necessary messages, without waiting for a global clock or for all other parties to reach the same stage. This makes the system more resilient to network latency and temporary unavailability of some participants.
