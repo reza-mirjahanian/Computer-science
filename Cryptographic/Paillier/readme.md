@@ -1,5 +1,5 @@
 https://openmined.org/blog/the-paillier-cryptosystem/
-
+,
 
 Paillier encryption is a public-key cryptography system that allows for homomorphic operations on encrypted data. It enables mathematical operations like **addition and multiplication** to be performed **directly** on ciphertext, without the need to decrypt the data first. This makes Paillier encryption useful for applications that require privacy-preserving computations on encrypted data.
 
