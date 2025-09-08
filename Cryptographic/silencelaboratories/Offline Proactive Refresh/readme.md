@@ -1,5 +1,7 @@
 ## Background: Threshold Signature Schemes (TSS)
 
+![alt text](image.png)
+
 * TSS uses multi-party computation (MPC) to split control of a digital secret across *n* parties, requiring at least *t* parties to jointly sign a transaction. This eliminates single-point-of-failure vulnerabilities.
 
 ## What Is Proactive Refresh?
