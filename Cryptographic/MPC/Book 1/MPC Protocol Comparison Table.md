@@ -1,4 +1,4 @@
-
+![alt text](image.png)
 
 ## MPC Protocol Comparison Table
 
