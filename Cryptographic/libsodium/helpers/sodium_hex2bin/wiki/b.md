@@ -65,7 +65,7 @@ if ((c_num0 | c_alpha0) == 0U) {Of course\! Let's break down this C function tog
 This function, `sodium_hex2bin`, is from the famous Libsodium cryptographic library. Its job is to convert a **hexadecimal string** (like `"4A6F65"`) into its raw **binary representation** (like the bytes `0x4A`, `0x6F`, `0x65`).
 
 Think of it as translating from a human-readable text format (hex) to a computer's native byte format.
-
+```
 Let's look at it section by section.
 
 -----
