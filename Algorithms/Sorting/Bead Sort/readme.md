@@ -1,3 +1,5 @@
+https://mathworld.wolfram.com/Bead-Sort.html
+
 Bead Sort, also known as Gravity Sort, is a natural sorting algorithm designed specifically for sorting lists of positive integers by simulating the physical process of beads falling under gravity on parallel rods, similar to an abacus [1][8].
 
 ### How Bead Sort Works
