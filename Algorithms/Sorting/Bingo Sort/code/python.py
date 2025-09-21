@@ -6,11 +6,9 @@ def bingo_sort(arr):
     if len(arr) <= 1:
         return arr
 
-    # Find the maximum value in the array
-    max_val = max(arr)
 
     # Place all elements in sorted position starting from the end
-    next_val = max_val
+
     i = len(arr) - 1
 
     while i >= 0:
