@@ -1,6 +1,4 @@
-Alright, let’s learn **Nash Equilibrium** like you’re sitting in the front row, no jargon fog, just clarity.
 
----
 
 ### 1. The 30-Second Story
 Imagine you and a friend are picking **movies** on Netflix at the same time.  
@@ -71,5 +69,3 @@ Key word: **best response** – you can’t do better *given what everyone else 
 Nash Equilibrium is the **“no regrets”** point: after the dust settles, **nobody wishes they had done something else unilaterally**.
 
 ---
-
-Try it yourself: grab any 2×2 matrix, circle the best responses, and see where both players’ circles overlap – that’s your NE.
