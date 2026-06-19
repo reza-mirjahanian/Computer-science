@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Operational vs Analytical Systems | OLTP vs OLAP</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  :root{
+    --bg:#0F172A; --card:#111C36; --blue:#3B82F6; --cyan:#22D3EE;
+    --green:#22C55E; --yellow:#EAB308; --red:#EF4444; --muted:#94A3B8;
+  }
+  body{background:var(--bg); font-family:'Segoe UI',ui-sans-serif,system-ui,sans-serif;}
+  .card{background:linear-gradient(180deg,#101B33,#0D1730); border:1px solid #1E293B; border-radius:1rem;}
+  .card:hover{border-color:#334155; transform:translateY(-4px); box-shadow:0 10px 30px -10px rgba(34,211,238,0.15);}
+  .card{transition:all .35s ease;}
+  .reveal{opacity:0; transform:translateY(24px); transition:opacity .7s ease, transform .7s ease;}
+  .reveal.show{opacity:1; transform:translateY(0);}
+  .glow-blue{box-shadow:0 0 30px -8px rgba(59,130,246,.5);}
+  .glow-green{box-shadow:0 0 30px -8px rgba(34,197,94,.5);}
+  .glow-yellow{box-shadow:0 0 30px -8px rgba(234,179,8,.5);}
+  .pill{font-size:.7rem; letter-spacing:.05em; padding:.2rem .6rem; border-radius:999px; font-weight:600;}
+  .dash{stroke-dasharray:6 6; animation:dashmove 1.2s linear infinite;}
+  @keyframes dashmove{to{stroke-dashoffset:-24;}}
+  .floaty{animation:floaty 4s ease-in-out infinite;}
+  @keyframes floaty{0%,100%{transform:translateY(0);}50%{transform:translateY(-6px);}}
+  .pulse-dot{animation:pulseDot 1.6s ease-in-out infinite;}
+  @keyframes pulseDot{0%,100%{opacity:.4; r:4;}50%{opacity:1; r:6;}}
+  table.cmp th, table.cmp td{padding:.75rem 1rem; border-bottom:1px solid #1E293B;}
+  table.cmp th{color:var(--cyan); text-align:left; font-size:.8rem; text-transform:uppercase; letter-spacing:.04em;}
+  code.inline{background:#0B1426; border:1px solid #1E293B; padding:.1rem .4rem; border-radius:.3rem; color:#7DD3FC; font-size:.85em;}
+  .badge-rec{background:rgba(34,197,94,.15); color:#4ADE80; border:1px solid rgba(34,197,94,.4);}
+  @media (prefers-reduced-motion: reduce){
+    *{animation:none !important; transition:none !important;}
+  }
+  ::-webkit-scrollbar{width:10px;}
+  ::-webkit-scrollbar-track{background:#0B1426;}
+  ::-webkit-scrollbar-thumb{background:#1E293B; border-radius:10px;}
+</style>
+</head>
+<body class="text-slate-200 antialiased">
+
+<!-- HERO -->
+<header class="relative overflow-hidden border-b border-slate-800">
+  <div class="absolute inset-0 opacity-30" style="background:radial-gradient(circle at 20% 20%, #3B82F6 0%, transparent 35%), radial-gradient(circle at 80% 60%, #22D3EE 0%, transparent 35%);"></div>
+  <div class="relative max-w-6xl mx-auto px-6 py-20 text-center">
+    <span class="pill bg-cyan-500/10 text-cyan-300 border border-cyan-500/30">SYSTEM DESIGN 101</span>
+    <h1 class="mt-6 text-4xl md:text-6xl font-extrabold tracking-tight text-white">
+      Operational <span class="text-blue-400">(OLTP)</span> vs
+      Analytical <span class="text-cyan-400">(OLAP)</span> Systems
+    </h1>
+    <p class="mt-5 text-lg text-slate-400 max-w-2xl mx-auto">
+      Two different jobs. Two different databases. Mixing them up is the #1 cause of slow apps and slow dashboards.
+    </p>
+  </div>
+</header>
+
+<main class="max-w-6xl mx-auto px-6">
+
+<!-- 1. WHAT PROBLEM -->
+<section class="py-16 reveal">
+  <h2 class="text-2xl md:text-3xl font-bold text-white mb-2">1. The Problem</h2>
+  <p class="text-slate-400 mb-8 max-w-2xl">One system runs the business. Another system understands the business. You can't optimize a database for both at the same time.</p>
+  <div class="grid md:grid-cols-2 gap-6">
+    <div class="card p-6 glow-blue">
+      <div class="flex items-center gap-3 mb-3">
+        <span class="text-2xl">⚡</span>
+        <h3 class="text-xl font-bold text-blue-400">Operational (OLTP)</h3>
+      </div>
+      <p class="text-slate-300 text-sm">Powers the app right now. "Place this order." "Update this balance." Millions of <span class="text-blue-300 font-semibold">small, fast</span> read/write transactions.</p>
+    </div>
+    <div class="card p-6 glow-yellow">
+      <div class="flex items-center gap-3 mb-3">
+        <span class="text-2xl">📊</span>
+        <h3 class="text-xl font-bold text-cyan-400">Analytical (OLAP)</h3>
+      </div>
+      <p class="text-slate-300 text-sm">Powers decisions. "What were sales by region last quarter?" Few <span class="text-cyan-300 font-semibold">huge, slow</span> queries scanning billions of rows.</p>
+    </div>
+  </div>
+</section>
+
+<!-- 2. WHY ENGINEERS CARE -->
+<section class="py-10 reveal">
+  <h2 class="text-2xl md:text-3xl font-bold text-white mb-6">2. Why Engineers Care</h2>
+  <div class="grid sm:grid-cols-3 gap-5">
+    <div class="card p-5">
+      <p class="text-sm text-slate-300"><span class="text-red-400 font-semibold">Heavy analytics on OLTP</span> locks tables and crashes production checkout.</p>
+    </div>
+    <div class="card p-5">
+      <p class="text-sm text-slate-300"><span class="text-green-400 font-semibold">Wrong storage shape</span> turns a 2-second report into a 2-hour timeout.</p>
+    </div>
+    <div class="card p-5">
+      <p class="text-sm text-slate-300"><span class="text-yellow-400 font-semibold">Right split</span> = fast checkout AND fast dashboards, simultaneously.</p>
+    </div>
+  </div>
+</section>
+
+<!-- 3. HOW IT WORKS / ARCHITECTURE -->
+<section class="py-16 reveal">
+  <h2 class="text-2xl md:text-3xl font-bold text-white mb-2">3. How It Works — Architecture</h2>
+  <p class="text-slate-400 mb-8 max-w-2xl">OLTP stores live data row-by-row. A pipeline copies and reshapes it into OLAP, column-by-column, for analytics.</p>
+
+  <div class="card p-6 overflow-x-auto">
+    <svg viewBox="0 0 1000 360" class="w-full min-w-[760px]" id="archSvg">
+      <defs>
+        <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+          <path d="M0,0 L0,6 L9,3 z" fill="#22D3EE"/>
+        </marker>
+        <marker id="arrowBlue" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+          <path d="M0,0 L0,6 L9,3 z" fill="#3B82F6"/>
+        </marker>
+      </defs>
+
+      <!-- App -->
+      <g class="floaty">
+        <rect x="20" y="150" width="130" height="60" rx="12" fill="#0B1426" stroke="#3B82F6" stroke-width="2"/>
+        <text x="85" y="175" text-anchor="middle" fill="#93C5FD" font-size="13" font-weight="600">App / API</text>
+        <text x="85" y="193" text-anchor="middle" fill="#64748B" font-size="11">user requests</text>
+      </g>
+
+      <!-- arrow to OLTP -->
+      <line x1="150" y1="180" x2="225" y2="180" stroke="#3B82F6" stroke-width="2.5" class="dash" marker-end="url(#arrowBlue)"/>
+
+      <!-- OLTP DB -->
+      <g>
+        <rect x="230" y="120" width="160" height="120" rx="14" fill="#0B1426" stroke="#3B82F6" stroke-width="2.5"/>
+        <text x="310" y="150" text-anchor="middle" fill="#3B82F6" font-size="15" font-weight="700">OLTP</text>
+        <text x="310" y="170" text-anchor="middle" fill="#93C5FD" font-size="11">PostgreSQL / MySQL</text>
+        <!-- row icons -->
+        <rect x="250" y="185" width="120" height="10" rx="2" fill="#1E3A8A"/>
+        <rect x="250" y="200" width="120" height="10" rx="2" fill="#1E3A8A"/>
+        <rect x="250" y="215" width="120" height="10" rx="2" fill="#1E3A8A"/>
+        <circle cx="365" cy="190" r="4" fill="#22C55E" class="pulse-dot"/>
+      </g>
+
+      <!-- arrow ETL -->
+      <line x1="390" y1="180" x2="500" y2="180" stroke="#EAB308" stroke-width="2.5" class="dash" marker-end="url(#arrow)"/>
+      <text x="445" y="165" text-anchor="middle" fill="#EAB308" font-size="11" font-weight="600">ETL / CDC</text>
+
+      <!-- Pipeline box -->
+      <g class="floaty">
+        <rect x="500" y="140" width="140" height="80" rx="12" fill="#0B1426" stroke="#EAB308" stroke-width="2"/>
+        <text x="570" y="170" text-anchor="middle" fill="#FACC15" font-size="13" font-weight="600">Pipeline</text>
+        <text x="570" y="188" text-anchor="middle" fill="#64748B" font-size="10">batch / streaming</text>
+      </g>
+
+      <!-- arrow to OLAP -->
+      <line x1="640" y1="180" x2="710" y2="180" stroke="#22D3EE" stroke-width="2.5" class="dash" marker-end="url(#arrow)"/>
+
+      <!-- OLAP DB -->
+      <g>
+        <rect x="715" y="110" width="170" height="140" rx="14" fill="#0B1426" stroke="#22D3EE" stroke-width="2.5"/>
+        <text x="800" y="138" text-anchor="middle" fill="#22D3EE" font-size="15" font-weight="700">OLAP</text>
+        <text x="800" y="158" text-anchor="middle" fill="#67E8F9" font-size="11">Snowflake / BigQuery / ClickHouse</text>
+        <!-- column icons -->
+        <rect x="735" y="170" width="12" height="60" rx="2" fill="#155E75"/>
+        <rect x="752" y="170" width="12" height="60" rx="2" fill="#0E7490"/>
+        <rect x="769" y="170" width="12" height="60" rx="2" fill="#155E75"/>
+        <rect x="786" y="170" width="12" height="60" rx="2" fill="#0E7490"/>
+        <rect x="803" y="170" width="12" height="60" rx="2" fill="#155E75"/>
+        <rect x="820" y="170" width="12" height="60" rx="2" fill="#0E7490"/>
+        <rect x="837" y="170" width="12" height="60" rx="2" fill="#155E75"/>
+      </g>
+
+      <!-- BI -->
+      <line x1="885" y1="180" x2="950" y2="180" stroke="#22D3EE" stroke-width="2.5" class="dash" marker-end="url(#arrow)"/>
+      <g class="floaty">
+        <rect x="940" y="150" width="50" height="60" rx="10" fill="#0B1426" stroke="#22D3EE" stroke-width="2"/>
+        <text x="965" y="183" text-anchor="middle" fill="#67E8F9" font-size="20">📈</text>
+      </g>
+
+      <text x="85" y="270" text-anchor="middle" fill="#64748B" font-size="11">checkout, login,</text>
+      <text x="85" y="285" text-anchor="middle" fill="#64748B" font-size="11">inventory update</text>
+
+      <text x="800" y="280" text-anchor="middle" fill="#64748B" font-size="11">dashboards, reports,</text>
+      <text x="800" y="295" text-anchor="middle" fill="#64748B" font-size="11">ML features</text>
+    </svg>
+  </div>
+</section>
+
+<!-- 5. REQUEST / DATA FLOW -->
+<section class="py-16 reveal">
+  <h2 class="text-2xl md:text-3xl font-bold text-white mb-2">5. Data Flow: Input → Processing → Output</h2>
+  <div class="grid md:grid-cols-3 gap-6 mt-8">
+    <div class="card p-6 text-center">
+      <div class="text-3xl mb-3">📝</div>
+      <h4 class="font-bold text-blue-400 mb-1">Input</h4>
+      <p class="text-sm text-slate-400">User submits an order → row inserted into OLTP, transaction commits in milliseconds.</p>
+    </div>
+    <div class="card p-6 text-center">
+      <div class="text-3xl mb-3">🔄</div>
+      <h4 class="font-bold text-yellow-400 mb-1">Processing</h4>
+      <p class="text-sm text-slate-400">CDC stream or nightly batch extracts changes, transforms, loads into OLAP warehouse.</p>
+    </div>
+    <div class="card p-6 text-center">
+      <div class="text-3xl mb-3">📊</div>
+      <h4 class="font-bold text-cyan-400 mb-1">Output</h4>
+      <p class="text-sm text-slate-400">Analyst runs a query scanning years of orders → aggregated chart in seconds.</p>
+    </div>
+  </div>
+</section>
+
+<!-- COMPARISON TABLE -->
+<section class="py-16 reveal">
+  <h2 class="text-2xl md:text-3xl font-bold text-white mb-6">12. Comparison Table</h2>
+  <div class="card p-2 overflow-x-auto">
+    <table class="cmp w-full min-w-[640px]">
+      <thead>
+        <tr><th>Aspect</th><th>OLTP</th><th>OLAP</th></tr>
+      </thead>
+      <tbody class="text-sm text-slate-300">
+        <tr><td>Purpose</td><td>Run the business</td><td>Understand the business</td></tr>
+        <tr><td>Query pattern</td><td>Short reads/writes</td><td>Large scans & aggregations</td></tr>
+        <tr><td>Storage layout</td><td>Row-oriented</td><td>Column-oriented</td></tr>
+        <tr><td>Schema</td><td>Normalized (3NF)</td><td>Star / Snowflake schema</td></tr>
+        <tr><td>Latency</td><td>Milliseconds</td><td>Seconds to minutes</td></tr>
+        <tr><td>Concurrency</td><td>Thousands of users</td><td>Few analysts/jobs</td></tr>
+        <tr><td>Example tools</td><td>PostgreSQL, MySQL, DynamoDB</td><td>Snowflake, BigQuery, ClickHouse, Redshift</td></tr>
+        <tr><td>Recommended for</td><td><span class="pill badge-rec">Checkout, auth, inventory</span></td><td><span class="pill badge-rec">Dashboards, reports, ML training</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ADVANTAGES -->
+<section class="py-16 reveal">
+  <h2 class="text-2xl md:text-3xl font-bold text-white mb-6">6. Advantages</h2>
+  <div class="grid md:grid-cols-2 gap-6">
+    <div class="card p-6">
+      <h3 class="text-blue-400 font-bold mb-3">OLTP strengths</h3>
+      <ul class="text-sm text-slate-300 space-y-2">
+        <li>✅ ACID guarantees keep data consistent</li>
+        <li>✅ Millisecond response for single records</li>
+        <li>✅ Scales to thousands of concurrent users</li>
+      </ul>
+    </div>
+    <div class="card p-6">
+      <h3 class="text-cyan-400 font-bold mb-3">OLAP strengths</h3>
+      <ul class="text-sm text-slate-300 space-y-2">
+        <li>✅ Scans billions of rows fast (columnar + compression)</li>
+        <li>✅ Built for complex aggregations & joins</li>
+        <li>✅ Decoupled from production load</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- TRADE-OFFS -->
+<section class="py-16 reveal">
+  <h2 class="text-2xl md:text-3xl font-bold text-white mb-6">7. Trade-offs</h2>
+  <div class="grid md:grid-cols-2 gap-6">
+    <div class="card p-6 border-l-4" style="border-left-color:#EF4444;">
+      <h3 class="text-red-400 font-bold mb-3">OLTP limits</h3>
+      <p class="text-sm text-slate-300">Bad at scanning huge ranges. Row storage wastes I/O when you only need 2 of 50 columns.</p>
+    </div>
+    <div class="card p-6 border-l-4" style="border-left-color:#EF4444;">
+      <h3 class="text-red-400 font-bold mb-3">OLAP limits</h3>
+      <p class="text-sm text-slate-300">Bad at single-row updates. Data is usually stale by minutes-to-hours (pipeline lag).</p>
+    </div>
+  </div>
+</section>
+
+<!-- COMMON MISTAKES -->
+<section class="py-16 reveal">
+  <h2 class="text-2xl md:text-3xl font-bold text-white mb-6">8. Common Mistakes</h2>
+  <div class="grid md:grid-cols-3 gap-5">
+    <div class="card p-5 border border-red-900/40">
+      <p class="text-red-400 font-semibold mb-1">⚠ Running reports on prod OLTP</p>
+      <p class="text-sm text-slate-400">A heavy <code class="inline">GROUP BY</code> on the orders table locks rows and slows checkout for everyone.</p>
+    </div>
+    <div class="card p-5 border border-red-900/40">
+      <p class="text-red-400 font-semibold mb-1">⚠ Treating OLAP as real-time</p>
+      <p class="text-sm text-slate-400">Expecting a warehouse to reflect data inserted 2 seconds ago. It's batch/streaming, not instant.</p>
+    </div>
+    <div class="card p-5 border border-red-900/40">
+      <p class="text-red-400 font-semibold mb-1">⚠ No CDC, only nightly dumps</p>
+      <p class="text-sm text-slate-400">Dashboards 24h stale during incidents. Use change-data-capture for near-real-time needs.</p>
+    </div>
+  </div>
+</section>
+
+<!-- PRACTICAL EXAMPLE -->
+<section class="py-16 reveal">
+  <h2 class="text-2xl md:text-3xl font-bold text-white mb-6">Practical Example</h2>
+  <div class="card p-6">
+    <p class="text-sm text-slate-400 mb-4">An e-commerce platform: orders write to Postgres (OLTP). A CDC tool (e.g. Debezium) streams changes into Kafka, which loads into ClickHouse (OLAP) for the revenue dashboard.</p>
+<pre class="text-xs bg-[#0B1426] border border-slate-800 rounded-lg p-4 overflow-x-auto text-cyan-300"><code>-- OLTP: fast single insert
+INSERT INTO orders (id, user_id, total, created_at)
+VALUES (5821, 901, 79.99, now());
+
+-- OLAP: heavy aggregation, runs in warehouse, not prod
+SELECT region, date_trunc('month', created_at) AS month,
+       SUM(total) AS revenue
+FROM orders_fact
+GROUP BY region, month
+ORDER BY month;</code></pre>
+  </div>
+</section>
+
+<!-- KEY TAKEAWAYS -->
+<section class="py-16 reveal">
+  <h2 class="text-2xl md:text-3xl font-bold text-white mb-6">Key Takeaways</h2>
+  <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
+    <div class="card p-5"><p class="text-sm">🔹 OLTP = operations, OLAP = analytics. Different jobs.</p></div>
+    <div class="card p-5"><p class="text-sm">🔹 Row storage for transactions, column storage for aggregation.</p></div>
+    <div class="card p-5"><p class="text-sm">🔹 Never run heavy analytics directly on production OLTP.</p></div>
+    <div class="card p-5"><p class="text-sm">🔹 Pipelines (ETL/CDC) connect the two systems.</p></div>
+    <div class="card p-5"><p class="text-sm">🔹 OLAP data is eventually consistent, not real-time.</p></div>
+    <div class="card p-5"><p class="text-sm">🔹 Star schemas make OLAP queries simple and fast.</p></div>
+    <div class="card p-5"><p class="text-sm">🔹 Pick tools by access pattern, not by hype.</p></div>
+    <div class="card p-5"><p class="text-sm">🔹 Most real systems need both — together, not instead.</p></div>
+  </div>
+</section>
+
+<footer class="py-10 text-center text-slate-500 text-xs border-t border-slate-800">
+  Built as an educational infographic · Inspired by ByteByteGo style
+</footer>
+
+</main>
+
+<script>
+  const reveals = document.querySelectorAll('.reveal');
+  const io = new IntersectionObserver((entries)=>{
+    entries.forEach(e=>{
+      if(e.isIntersecting){ e.target.classList.add('show'); io.unobserve(e.target); }
+    });
+  }, {threshold:0.12});
+  reveals.forEach(el=>io.observe(el));
+</script>
+</body>
+</html>

@@ -1,0 +1,1133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Operational vs Analytical Systems — OLTP vs OLAP</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0F172A;
+    --card: #1E293B;
+    --border: #293548;
+    --text: #E2E8F0;
+    --muted: #94A3B8;
+    --blue: #60A5FA;
+    --cyan: #22D3EE;
+    --green: #34D399;
+    --yellow: #FBBF24;
+    --red: #F87171;
+    --purple: #A78BFA;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    font-family: 'Inter', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    margin: 0;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    background-image:
+      radial-gradient(ellipse 900px 500px at 12% -10%, rgba(59, 130, 246, 0.12) 0%, transparent 60%),
+      radial-gradient(ellipse 700px 500px at 88% 8%, rgba(6, 182, 212, 0.08) 0%, transparent 60%),
+      radial-gradient(ellipse 900px 600px at 50% 110%, rgba(16, 185, 129, 0.07) 0%, transparent 60%);
+    background-attachment: fixed;
+  }
+  code, .mono { font-family: 'JetBrains Mono', monospace; }
+
+  #progressBar {
+    position: fixed; top: 0; left: 0; height: 3px;
+    background: linear-gradient(90deg, var(--blue), var(--cyan), var(--green));
+    z-index: 100; width: 0%;
+    box-shadow: 0 0 12px rgba(59, 130, 246, 0.6);
+  }
+
+  .reveal { opacity: 0; transform: translateY(24px); transition: opacity 0.7s cubic-bezier(0.16, 1, 0.3, 1), transform 0.7s cubic-bezier(0.16, 1, 0.3, 1); }
+  .reveal.in { opacity: 1; transform: translateY(0); }
+  .reveal-d1 { transition-delay: 0.08s; }
+  .reveal-d2 { transition-delay: 0.16s; }
+  .reveal-d3 { transition-delay: 0.24s; }
+  .reveal-d4 { transition-delay: 0.32s; }
+  .reveal-d5 { transition-delay: 0.40s; }
+
+  .card {
+    background: linear-gradient(180deg, rgba(30, 41, 59, 0.65) 0%, rgba(30, 41, 59, 0.35) 100%);
+    border: 1px solid var(--border);
+    border-radius: 1rem;
+    backdrop-filter: blur(8px);
+    transition: transform 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
+  }
+  .card-hover:hover {
+    transform: translateY(-4px);
+    border-color: rgba(59, 130, 246, 0.5);
+    box-shadow: 0 16px 50px -12px rgba(59, 130, 246, 0.25);
+  }
+
+  @keyframes float {
+    0%, 100% { transform: translate(0, 0); }
+    50% { transform: translate(0, -6px); }
+  }
+  .float { animation: float 5s ease-in-out infinite; }
+  .float-1 { animation-delay: 0.5s; }
+  .float-2 { animation-delay: 1s; }
+  .float-3 { animation-delay: 1.5s; }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+  .pulse { animation: pulse 2s ease-in-out infinite; }
+
+  @keyframes dash-flow {
+    to { stroke-dashoffset: -24; }
+  }
+  .flow {
+    stroke-dasharray: 8 4;
+    animation: dash-flow 1s linear infinite;
+  }
+
+  .gradient-text {
+    background: linear-gradient(135deg, #60A5FA 0%, #22D3EE 50%, #34D399 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  .code-block {
+    background: #0B1120;
+    border: 1px solid var(--border);
+    border-radius: 0.75rem;
+    padding: 1rem 1.25rem;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.82rem;
+    color: #94A3B8;
+    overflow-x: auto;
+    line-height: 1.75;
+    white-space: pre;
+  }
+  .code-block .kw { color: #F87171; }
+  .code-block .str { color: #FCD34D; }
+  .code-block .com { color: #64748B; font-style: italic; }
+  .code-block .fn { color: #60A5FA; }
+  .code-block .num { color: #34D399; }
+
+  .section-tag {
+    display: inline-flex; align-items: center; gap: 0.6rem;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.72rem;
+    color: var(--muted);
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+  }
+  .section-tag::before {
+    content: '';
+    width: 28px; height: 1px;
+    background: linear-gradient(90deg, var(--blue), transparent);
+  }
+
+  .grid-bg {
+    background-image:
+      linear-gradient(rgba(51, 65, 85, 0.18) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(51, 65, 85, 0.18) 1px, transparent 1px);
+    background-size: 28px 28px;
+  }
+
+  .tag {
+    display: inline-block; padding: 0.2rem 0.65rem;
+    border-radius: 0.4rem;
+    font-size: 0.7rem;
+    font-weight: 600;
+    font-family: 'JetBrains Mono', monospace;
+    letter-spacing: 0.05em;
+  }
+  .tag-cyan { background: rgba(34, 211, 238, 0.12); color: var(--cyan); border: 1px solid rgba(34, 211, 238, 0.3); }
+  .tag-green { background: rgba(52, 211, 153, 0.12); color: var(--green); border: 1px solid rgba(52, 211, 153, 0.3); }
+  .tag-yellow { background: rgba(251, 191, 36, 0.12); color: var(--yellow); border: 1px solid rgba(251, 191, 36, 0.3); }
+  .tag-red { background: rgba(239, 68, 68, 0.12); color: var(--red); border: 1px solid rgba(239, 68, 68, 0.3); }
+  .tag-blue { background: rgba(96, 165, 250, 0.12); color: var(--blue); border: 1px solid rgba(96, 165, 250, 0.3); }
+  .tag-purple { background: rgba(167, 139, 250, 0.12); color: var(--purple); border: 1px solid rgba(167, 139, 250, 0.3); }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+    .reveal { opacity: 1; transform: none; }
+  }
+
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--blue); }
+</style>
+</head>
+<body>
+<div id="progressBar"></div>
+
+<!-- HERO -->
+<section class="relative overflow-hidden">
+  <div class="absolute inset-0 grid-bg opacity-30"></div>
+  <div class="max-w-6xl mx-auto px-6 pt-20 pb-16 relative">
+    <div class="reveal"><span class="section-tag">System Design · Data Engineering · </span></div>
+    <h1 class="reveal reveal-d1 mt-6 text-5xl md:text-7xl font-extrabold tracking-tight leading-[1.05]">
+      Operational vs<br>
+      <span class="gradient-text">Analytical Systems</span>
+    </h1>
+    <p class="reveal reveal-d2 mt-6 text-lg md:text-xl text-slate-400 max-w-2xl">
+      OLTP and OLAP solve different problems. Mixing them in one database is the fastest way to break both. Here is how they differ — and how they fit together.
+    </p>
+    <div class="reveal reveal-d3 mt-8 flex flex-wrap gap-2">
+      <span class="tag tag-cyan">OLTP</span>
+      <span class="tag tag-green">OLAP</span>
+      <span class="tag tag-yellow">CDC</span>
+      <span class="tag tag-purple">HTAP</span>
+      <span class="tag tag-blue">Lakehouse</span>
+    </div>
+
+    <div class="grid md:grid-cols-2 gap-4 mt-12">
+      <div class="card card-hover p-6 reveal reveal-d3">
+        <div class="flex items-center justify-between mb-3">
+          <span class="tag tag-cyan">OLTP</span>
+          <span class="text-xs text-slate-500 mono">~ ms latency</span>
+        </div>
+        <div class="text-4xl font-bold text-cyan-300">10k+</div>
+        <div class="text-sm text-slate-400 mt-1">transactions per second</div>
+        <div class="text-xs text-slate-500 mt-3">Powering checkouts, logins, payments — the live business.</div>
+      </div>
+      <div class="card card-hover p-6 reveal reveal-d4">
+        <div class="flex items-center justify-between mb-3">
+          <span class="tag tag-green">OLAP</span>
+          <span class="text-xs text-slate-500 mono">~ seconds to minutes</span>
+        </div>
+        <div class="text-4xl font-bold text-emerald-300">Petabytes</div>
+        <div class="text-sm text-slate-400 mt-1">scanned per query</div>
+        <div class="text-xs text-slate-500 mt-3">Powering dashboards, reports, ML — the historical view.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- PROBLEM -->
+<section class="relative py-16">
+  <div class="max-w-6xl mx-auto px-6">
+    <div class="reveal"><span class="section-tag">01 · The Problem</span></div>
+    <h2 class="reveal reveal-d1 mt-3 text-3xl md:text-4xl font-bold mb-4">One database. Two masters. Both lose.</h2>
+    <p class="reveal reveal-d2 text-slate-400 max-w-2xl mb-10">
+      Production databases serve live users. Analysts serve the business. Each wants the opposite of the other.
+    </p>
+
+    <div class="grid md:grid-cols-3 gap-4">
+      <div class="card card-hover p-6 reveal reveal-d1">
+        <div class="w-10 h-10 rounded-lg bg-red-500/10 border border-red-500/30 flex items-center justify-center mb-4">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#F87171" stroke-width="2"><path d="M12 9v4M12 17h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>
+        </div>
+        <h3 class="font-semibold mb-2">Lock Contention</h3>
+        <p class="text-sm text-slate-400">A heavy <span class="mono text-yellow-300">GROUP BY</span> scan locks rows. Checkout requests stall. Users see timeouts.</p>
+      </div>
+      <div class="card card-hover p-6 reveal reveal-d2">
+        <div class="w-10 h-10 rounded-lg bg-yellow-500/10 border border-yellow-500/30 flex items-center justify-center mb-4">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FCD34D" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 9h6v6H9z"/></svg>
+        </div>
+        <h3 class="font-semibold mb-2">Schema Mismatch</h3>
+        <p class="text-sm text-slate-400">Normalized for writes (3NF). Denormalized for scans (star schema). You cannot optimize for both at once.</p>
+      </div>
+      <div class="card card-hover p-6 reveal reveal-d3">
+        <div class="w-10 h-10 rounded-lg bg-blue-500/10 border border-blue-500/30 flex items-center justify-center mb-4">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#60A5FA" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+        </div>
+        <h3 class="font-semibold mb-2">Different Time Horizons</h3>
+        <p class="text-sm text-slate-400">Users need <span class="text-blue-300">now</span>. Analysts need <span class="text-emerald-300">3 years of history</span>. Retention rules conflict.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- OLTP -->
+<section class="relative py-16">
+  <div class="max-w-6xl mx-auto px-6">
+    <div class="reveal"><span class="section-tag">02 · OLTP — Operational Systems</span></div>
+    <h2 class="reveal reveal-d1 mt-3 text-3xl md:text-4xl font-bold mb-4">
+      The system that <span class="text-cyan-300">runs the business</span>.
+    </h2>
+    <p class="reveal reveal-d2 text-slate-400 max-w-2xl mb-10">
+      OLTP = Online Transaction Processing. Handles live, short, frequent reads and writes. Every checkout, every login, every like.
+    </p>
+
+    <div class="grid md:grid-cols-5 gap-4">
+      <div class="md:col-span-2 card p-6 reveal reveal-d1">
+        <svg viewBox="0 0 280 220" class="w-full">
+          <g class="float">
+            <rect x="100" y="10" width="80" height="40" rx="8" fill="rgba(59,130,246,0.15)" stroke="#3B82F6" stroke-width="1.5"/>
+            <text x="140" y="34" text-anchor="middle" fill="#60A5FA" font-size="12" font-weight="600">App</text>
+          </g>
+          <path d="M 120 55 L 120 90 M 140 55 L 140 90 M 160 55 L 160 90" stroke="#3B82F6" stroke-width="1.5" class="flow"/>
+          <g>
+            <rect x="40" y="100" width="200" height="100" rx="10" fill="rgba(34,211,238,0.08)" stroke="#22D3EE" stroke-width="1.5"/>
+            <text x="140" y="125" text-anchor="middle" fill="#22D3EE" font-size="13" font-weight="700">OLTP Database</text>
+            <g font-family="JetBrains Mono" font-size="9" fill="#94A3B8">
+              <rect x="55" y="140" width="55" height="14" rx="3" fill="rgba(255,255,255,0.04)"/>
+              <text x="60" y="150">users</text>
+              <rect x="115" y="140" width="55" height="14" rx="3" fill="rgba(255,255,255,0.04)"/>
+              <text x="120" y="150">orders</text>
+              <rect x="175" y="140" width="55" height="14" rx="3" fill="rgba(255,255,255,0.04)"/>
+              <text x="180" y="150">items</text>
+              <rect x="85" y="165" width="115" height="14" rx="3" fill="rgba(255,255,255,0.04)"/>
+              <text x="92" y="175">payments, sessions...</text>
+            </g>
+          </g>
+          <circle cx="140" cy="55" r="4" fill="#22D3EE" class="pulse"/>
+        </svg>
+        <div class="text-xs text-slate-500 mt-3 text-center">Short queries · High frequency · Always-on</div>
+      </div>
+
+      <div class="md:col-span-3 grid sm:grid-cols-2 gap-3 reveal reveal-d2">
+        <div class="card p-5">
+          <div class="text-xs text-slate-500 mono mb-1">WORKLOAD</div>
+          <div class="font-semibold text-cyan-300">Short transactions</div>
+          <div class="text-xs text-slate-400 mt-1">INSERT, UPDATE, point SELECT</div>
+        </div>
+        <div class="card p-5">
+          <div class="text-xs text-slate-500 mono mb-1">VOLUME</div>
+          <div class="font-semibold text-cyan-300">High QPS</div>
+          <div class="text-xs text-slate-400 mt-1">Thousands per second</div>
+        </div>
+        <div class="card p-5">
+          <div class="text-xs text-slate-500 mono mb-1">DATA</div>
+          <div class="font-semibold text-cyan-300">Current state</div>
+          <div class="text-xs text-slate-400 mt-1">What is true right now</div>
+        </div>
+        <div class="card p-5">
+          <div class="text-xs text-slate-500 mono mb-1">CONSISTENCY</div>
+          <div class="font-semibold text-cyan-300">ACID, strict</div>
+          <div class="text-xs text-slate-400 mt-1">No partial writes</div>
+        </div>
+        <div class="card p-5">
+          <div class="text-xs text-slate-500 mono mb-1">INDEXING</div>
+          <div class="font-semibold text-cyan-300">B-Tree, heavy</div>
+          <div class="text-xs text-slate-400 mt-1">Optimized for lookups</div>
+        </div>
+        <div class="card p-5">
+          <div class="text-xs text-slate-500 mono mb-1">EXAMPLES</div>
+          <div class="font-semibold text-cyan-300 text-sm leading-tight">PostgreSQL · MySQL · DynamoDB · MongoDB</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- OLAP -->
+<section class="relative py-16">
+  <div class="max-w-6xl mx-auto px-6">
+    <div class="reveal"><span class="section-tag">03 · OLAP — Analytical Systems</span></div>
+    <h2 class="reveal reveal-d1 mt-3 text-3xl md:text-4xl font-bold mb-4">
+      The system that <span class="text-emerald-300">understands the business</span>.
+    </h2>
+    <p class="reveal reveal-d2 text-slate-400 max-w-2xl mb-10">
+      OLAP = Online Analytical Processing. Handles complex queries over massive historical data. Dashboards, reports, ML training sets.
+    </p>
+
+    <div class="grid md:grid-cols-5 gap-4">
+      <div class="md:col-span-3 grid sm:grid-cols-2 gap-3 reveal reveal-d1">
+        <div class="card p-5">
+          <div class="text-xs text-slate-500 mono mb-1">WORKLOAD</div>
+          <div class="font-semibold text-emerald-300">Complex aggregations</div>
+          <div class="text-xs text-slate-400 mt-1">GROUP BY, JOIN, windows</div>
+        </div>
+        <div class="card p-5">
+          <div class="text-xs text-slate-500 mono mb-1">VOLUME</div>
+          <div class="font-semibold text-emerald-300">Few queries, huge data</div>
+          <div class="text-xs text-slate-400 mt-1">TBs scanned per query</div>
+        </div>
+        <div class="card p-5">
+          <div class="text-xs text-slate-500 mono mb-1">DATA</div>
+          <div class="font-semibold text-emerald-300">Historical, append-only</div>
+          <div class="text-xs text-slate-400 mt-1">Years of fact tables</div>
+        </div>
+        <div class="card p-5">
+          <div class="text-xs text-slate-500 mono mb-1">CONSISTENCY</div>
+          <div class="font-semibold text-emerald-300">Eventual, relaxed</div>
+          <div class="text-xs text-slate-400 mt-1">Minutes of lag is fine</div>
+        </div>
+        <div class="card p-5">
+          <div class="text-xs text-slate-500 mono mb-1">STORAGE</div>
+          <div class="font-semibold text-emerald-300">Columnar</div>
+          <div class="text-xs text-slate-400 mt-1">Compressed, partitioned</div>
+        </div>
+        <div class="card p-5">
+          <div class="text-xs text-slate-500 mono mb-1">EXAMPLES</div>
+          <div class="font-semibold text-emerald-300 text-sm leading-tight">BigQuery · Snowflake · ClickHouse · Redshift · DuckDB</div>
+        </div>
+      </div>
+
+      <div class="md:col-span-2 card p-6 reveal reveal-d2">
+        <svg viewBox="0 0 280 220" class="w-full">
+          <g class="float">
+            <rect x="100" y="10" width="80" height="40" rx="8" fill="rgba(16,185,129,0.15)" stroke="#10B981" stroke-width="1.5"/>
+            <text x="140" y="34" text-anchor="middle" fill="#34D399" font-size="12" font-weight="600">Analyst · BI</text>
+          </g>
+          <path d="M 140 55 L 140 90" stroke="#10B981" stroke-width="1.5" class="flow"/>
+          <g>
+            <rect x="30" y="100" width="220" height="100" rx="10" fill="rgba(52,211,153,0.08)" stroke="#34D399" stroke-width="1.5"/>
+            <text x="140" y="125" text-anchor="middle" fill="#34D399" font-size="13" font-weight="700">OLAP Warehouse</text>
+            <g>
+              <rect x="55" y="140" width="14" height="40" fill="rgba(52,211,153,0.3)"/>
+              <rect x="73" y="145" width="14" height="35" fill="rgba(52,211,153,0.4)"/>
+              <rect x="91" y="135" width="14" height="45" fill="rgba(52,211,153,0.5)"/>
+              <rect x="109" y="150" width="14" height="30" fill="rgba(52,211,153,0.3)"/>
+              <rect x="127" y="142" width="14" height="38" fill="rgba(52,211,153,0.4)"/>
+              <rect x="145" y="138" width="14" height="42" fill="rgba(52,211,153,0.5)"/>
+              <rect x="163" y="148" width="14" height="32" fill="rgba(52,211,153,0.3)"/>
+              <rect x="181" y="140" width="14" height="40" fill="rgba(52,211,153,0.4)"/>
+              <rect x="199" y="146" width="14" height="34" fill="rgba(52,211,153,0.5)"/>
+            </g>
+            <text x="140" y="195" text-anchor="middle" fill="#64748B" font-size="9" font-family="JetBrains Mono">columnar · partitioned · compressed</text>
+          </g>
+        </svg>
+        <div class="text-xs text-slate-500 mt-3 text-center">Long queries · Few users · Massive scans</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ARCHITECTURE -->
+<section class="relative py-16">
+  <div class="max-w-6xl mx-auto px-6">
+    <div class="reveal"><span class="section-tag">04 · The Architecture</span></div>
+    <h2 class="reveal reveal-d1 mt-3 text-3xl md:text-4xl font-bold mb-4">How they fit together.</h2>
+    <p class="reveal reveal-d2 text-slate-400 max-w-2xl mb-10">
+      Operational and analytical systems are connected by a pipeline. Changes flow from OLTP to OLAP — never the other way around.
+    </p>
+
+    <div class="card p-6 md:p-8 reveal reveal-d2 overflow-x-auto">
+      <svg viewBox="0 0 1100 280" class="w-full min-w-[720px]">
+        <defs>
+          <marker id="arrow-blue" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+            <path d="M0,0 L0,6 L8,3 z" fill="#3B82F6"/>
+          </marker>
+          <marker id="arrow-yellow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+            <path d="M0,0 L0,6 L8,3 z" fill="#FBBF24"/>
+          </marker>
+          <marker id="arrow-green" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+            <path d="M0,0 L0,6 L8,3 z" fill="#34D399"/>
+          </marker>
+          <linearGradient id="grad-cyan" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#22D3EE" stop-opacity="0.22"/>
+            <stop offset="100%" stop-color="#22D3EE" stop-opacity="0.05"/>
+          </linearGradient>
+          <linearGradient id="grad-green" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#34D399" stop-opacity="0.22"/>
+            <stop offset="100%" stop-color="#34D399" stop-opacity="0.05"/>
+          </linearGradient>
+          <linearGradient id="grad-yellow" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#FBBF24" stop-opacity="0.22"/>
+            <stop offset="100%" stop-color="#FBBF24" stop-opacity="0.05"/>
+          </linearGradient>
+          <linearGradient id="grad-blue" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#60A5FA" stop-opacity="0.22"/>
+            <stop offset="100%" stop-color="#60A5FA" stop-opacity="0.05"/>
+          </linearGradient>
+        </defs>
+
+        <text x="80" y="65" text-anchor="middle" fill="#64748B" font-size="9" font-family="JetBrains Mono" letter-spacing="1.5">CLIENT</text>
+        <text x="260" y="65" text-anchor="middle" fill="#64748B" font-size="9" font-family="JetBrains Mono" letter-spacing="1.5">SOURCE</text>
+        <text x="440" y="65" text-anchor="middle" fill="#64748B" font-size="9" font-family="JetBrains Mono" letter-spacing="1.5">EXTRACT</text>
+        <text x="600" y="65" text-anchor="middle" fill="#64748B" font-size="9" font-family="JetBrains Mono" letter-spacing="1.5">STREAM</text>
+        <text x="780" y="65" text-anchor="middle" fill="#64748B" font-size="9" font-family="JetBrains Mono" letter-spacing="1.5">SINK</text>
+        <text x="980" y="65" text-anchor="middle" fill="#64748B" font-size="9" font-family="JetBrains Mono" letter-spacing="1.5">CONSUMERS</text>
+
+        <g class="float">
+          <rect x="20" y="90" width="120" height="100" rx="12" fill="url(#grad-blue)" stroke="#60A5FA" stroke-width="1.5"/>
+          <text x="80" y="120" text-anchor="middle" fill="#60A5FA" font-size="13" font-weight="700">Users</text>
+          <text x="80" y="140" text-anchor="middle" fill="#94A3B8" font-size="10">Web · Mobile</text>
+          <text x="80" y="158" text-anchor="middle" fill="#94A3B8" font-size="10">API clients</text>
+          <text x="80" y="178" text-anchor="middle" fill="#64748B" font-size="9" font-family="JetBrains Mono">writes</text>
+        </g>
+
+        <path d="M 145 140 L 175 140" stroke="#3B82F6" stroke-width="2" marker-end="url(#arrow-blue)" class="flow"/>
+
+        <g class="float float-1">
+          <rect x="180" y="80" width="160" height="120" rx="12" fill="url(#grad-cyan)" stroke="#22D3EE" stroke-width="1.5"/>
+          <text x="260" y="110" text-anchor="middle" fill="#22D3EE" font-size="14" font-weight="700">OLTP Database</text>
+          <text x="260" y="130" text-anchor="middle" fill="#94A3B8" font-size="10">PostgreSQL · MySQL</text>
+          <text x="260" y="148" text-anchor="middle" fill="#94A3B8" font-size="10">DynamoDB · Mongo</text>
+          <text x="260" y="178" text-anchor="middle" fill="#64748B" font-size="9" font-family="JetBrains Mono">live · ACID · normalized</text>
+        </g>
+
+        <path d="M 345 140 L 375 140" stroke="#FBBF24" stroke-width="2" marker-end="url(#arrow-yellow)" class="flow"/>
+        <text x="360" y="130" text-anchor="middle" fill="#FBBF24" font-size="9" font-family="JetBrains Mono">WAL</text>
+
+        <g class="float float-2">
+          <rect x="380" y="95" width="120" height="90" rx="12" fill="url(#grad-yellow)" stroke="#FBBF24" stroke-width="1.5"/>
+          <text x="440" y="122" text-anchor="middle" fill="#FBBF24" font-size="13" font-weight="700">CDC</text>
+          <text x="440" y="142" text-anchor="middle" fill="#94A3B8" font-size="9">Debezium</text>
+          <text x="440" y="158" text-anchor="middle" fill="#94A3B8" font-size="9">Flink · dbt</text>
+          <text x="440" y="178" text-anchor="middle" fill="#64748B" font-size="8" font-family="JetBrains Mono">transform</text>
+        </g>
+
+        <path d="M 505 140 L 535 140" stroke="#FBBF24" stroke-width="2" marker-end="url(#arrow-yellow)" class="flow"/>
+
+        <g class="float float-2">
+          <rect x="540" y="95" width="120" height="90" rx="12" fill="rgba(167,139,250,0.12)" stroke="#A78BFA" stroke-width="1.5"/>
+          <text x="600" y="122" text-anchor="middle" fill="#A78BFA" font-size="13" font-weight="700">Kafka</text>
+          <text x="600" y="142" text-anchor="middle" fill="#94A3B8" font-size="9">buffer · replay</text>
+          <text x="600" y="158" text-anchor="middle" fill="#94A3B8" font-size="9">decouple</text>
+          <text x="600" y="178" text-anchor="middle" fill="#64748B" font-size="8" font-family="JetBrains Mono">~5s lag</text>
+        </g>
+
+        <path d="M 665 140 L 695 140" stroke="#34D399" stroke-width="2" marker-end="url(#arrow-green)" class="flow"/>
+
+        <g class="float float-3">
+          <rect x="700" y="80" width="160" height="120" rx="12" fill="url(#grad-green)" stroke="#34D399" stroke-width="1.5"/>
+          <text x="780" y="110" text-anchor="middle" fill="#34D399" font-size="14" font-weight="700">OLAP Warehouse</text>
+          <text x="780" y="130" text-anchor="middle" fill="#94A3B8" font-size="10">BigQuery · Snowflake</text>
+          <text x="780" y="148" text-anchor="middle" fill="#94A3B8" font-size="10">ClickHouse · Redshift</text>
+          <text x="780" y="178" text-anchor="middle" fill="#64748B" font-size="9" font-family="JetBrains Mono">historical · columnar</text>
+        </g>
+
+        <path d="M 865 140 L 895 140" stroke="#34D399" stroke-width="2" marker-end="url(#arrow-green)" class="flow"/>
+
+        <g class="float float-1">
+          <rect x="900" y="80" width="160" height="120" rx="12" fill="rgba(52,211,153,0.1)" stroke="#34D399" stroke-width="1.5" stroke-dasharray="4 2"/>
+          <text x="980" y="110" text-anchor="middle" fill="#34D399" font-size="13" font-weight="700">Analysts · BI</text>
+          <text x="980" y="130" text-anchor="middle" fill="#94A3B8" font-size="10">Dashboards</text>
+          <text x="980" y="148" text-anchor="middle" fill="#94A3B8" font-size="10">Reports · ML</text>
+          <text x="980" y="178" text-anchor="middle" fill="#64748B" font-size="9" font-family="JetBrains Mono">read-only</text>
+        </g>
+
+        <g opacity="0.55">
+          <path d="M 865 240 L 175 240" stroke="#EF4444" stroke-width="1.5" stroke-dasharray="3 5" fill="none"/>
+          <circle cx="520" cy="240" r="13" fill="#0F172A" stroke="#EF4444" stroke-width="1.5"/>
+          <path d="M 514 234 L 526 246 M 526 234 L 514 246" stroke="#EF4444" stroke-width="1.8"/>
+          <text x="520" y="265" text-anchor="middle" fill="#EF4444" font-size="10" font-family="JetBrains Mono">no write-back to OLTP</text>
+        </g>
+
+        <text x="260" y="218" text-anchor="middle" fill="#22D3EE" font-size="9" font-family="JetBrains Mono">milliseconds</text>
+        <text x="600" y="218" text-anchor="middle" fill="#FBBF24" font-size="9" font-family="JetBrains Mono">seconds of lag</text>
+        <text x="780" y="218" text-anchor="middle" fill="#34D399" font-size="9" font-family="JetBrains Mono">years of history</text>
+      </svg>
+      <div class="text-center mt-2 text-xs text-slate-500">
+        Data flows <span class="text-yellow-300 font-semibold">left to right</span>. The analytical side never writes back to the operational side.
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- REQUEST FLOW -->
+<section class="relative py-16">
+  <div class="max-w-6xl mx-auto px-6">
+    <div class="reveal"><span class="section-tag">05 · Request Flow</span></div>
+    <h2 class="reveal reveal-d1 mt-3 text-3xl md:text-4xl font-bold mb-4">A single order, two journeys.</h2>
+    <p class="reveal reveal-d2 text-slate-400 max-w-2xl mb-10">
+      One user action propagates through the system. Fast path serves the user. Slow path serves the business.
+    </p>
+
+    <div class="grid md:grid-cols-2 gap-6">
+      <div class="card p-6 reveal reveal-d1">
+        <div class="flex items-center gap-2 mb-4">
+          <span class="tag tag-cyan">FAST PATH · &lt; 50ms</span>
+        </div>
+        <h3 class="text-lg font-semibold mb-4">User places an order</h3>
+        <div class="space-y-3">
+          <div class="flex gap-3">
+            <div class="w-7 h-7 rounded-full bg-cyan-500/20 border border-cyan-400/40 flex items-center justify-center text-xs font-bold text-cyan-300 flex-shrink-0">1</div>
+            <div class="text-sm text-slate-300">POST <span class="mono text-yellow-300">/orders</span> hits the API</div>
+          </div>
+          <div class="flex gap-3">
+            <div class="w-7 h-7 rounded-full bg-cyan-500/20 border border-cyan-400/40 flex items-center justify-center text-xs font-bold text-cyan-300 flex-shrink-0">2</div>
+            <div class="text-sm text-slate-300">App <span class="mono text-yellow-300">BEGIN</span> transaction</div>
+          </div>
+          <div class="flex gap-3">
+            <div class="w-7 h-7 rounded-full bg-cyan-500/20 border border-cyan-400/40 flex items-center justify-center text-xs font-bold text-cyan-300 flex-shrink-0">3</div>
+            <div class="text-sm text-slate-300">Insert into <span class="mono text-yellow-300">orders</span>, <span class="mono text-yellow-300">items</span>, <span class="mono text-yellow-300">payments</span></div>
+          </div>
+          <div class="flex gap-3">
+            <div class="w-7 h-7 rounded-full bg-cyan-500/20 border border-cyan-400/40 flex items-center justify-center text-xs font-bold text-cyan-300 flex-shrink-0">4</div>
+            <div class="text-sm text-slate-300">App <span class="mono text-yellow-300">COMMIT</span></div>
+          </div>
+          <div class="flex gap-3">
+            <div class="w-7 h-7 rounded-full bg-green-500/20 border border-green-400/40 flex items-center justify-center text-xs font-bold text-green-300 flex-shrink-0">5</div>
+            <div class="text-sm text-slate-300">User sees <span class="text-green-300 font-semibold">"Order confirmed"</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card p-6 reveal reveal-d2">
+        <div class="flex items-center gap-2 mb-4">
+          <span class="tag tag-green">SLOW PATH · seconds to minutes</span>
+        </div>
+        <h3 class="text-lg font-semibold mb-4">Order reaches analytics</h3>
+        <div class="space-y-3">
+          <div class="flex gap-3">
+            <div class="w-7 h-7 rounded-full bg-green-500/20 border border-green-400/40 flex items-center justify-center text-xs font-bold text-green-300 flex-shrink-0">1</div>
+            <div class="text-sm text-slate-300">CDC reads WAL entry for the insert</div>
+          </div>
+          <div class="flex gap-3">
+            <div class="w-7 h-7 rounded-full bg-green-500/20 border border-green-400/40 flex items-center justify-center text-xs font-bold text-green-300 flex-shrink-0">2</div>
+            <div class="text-sm text-slate-300">Event published to <span class="mono text-purple-300">orders.topic</span></div>
+          </div>
+          <div class="flex gap-3">
+            <div class="w-7 h-7 rounded-full bg-green-500/20 border border-green-400/40 flex items-center justify-center text-xs font-bold text-green-300 flex-shrink-0">3</div>
+            <div class="text-sm text-slate-300">Stream job enriches with user + product dims</div>
+          </div>
+          <div class="flex gap-3">
+            <div class="w-7 h-7 rounded-full bg-green-500/20 border border-green-400/40 flex items-center justify-center text-xs font-bold text-green-300 flex-shrink-0">4</div>
+            <div class="text-sm text-slate-300">Loaded into OLAP fact table</div>
+          </div>
+          <div class="flex gap-3">
+            <div class="w-7 h-7 rounded-full bg-green-500/20 border border-green-400/40 flex items-center justify-center text-xs font-bold text-green-300 flex-shrink-0">5</div>
+            <div class="text-sm text-slate-300">Dashboard refreshes: <span class="text-green-300 font-semibold">"Today's revenue +$42"</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card p-5 mt-6 reveal reveal-d3">
+      <div class="flex items-start gap-3">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FBBF24" stroke-width="2" class="flex-shrink-0 mt-0.5"><path d="M12 9v4M12 17h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>
+        <div class="text-sm text-slate-300">
+          <span class="font-semibold text-yellow-300">Key insight:</span> The user never waits for analytics. CDC decouples the two paths — the slow path can lag without anyone noticing.
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ROW VS COLUMNAR -->
+<section class="relative py-16">
+  <div class="max-w-6xl mx-auto px-6">
+    <div class="reveal"><span class="section-tag">06 · Storage · Why It Matters</span></div>
+    <h2 class="reveal reveal-d1 mt-3 text-3xl md:text-4xl font-bold mb-4">Row vs columnar storage.</h2>
+    <p class="reveal reveal-d2 text-slate-400 max-w-2xl mb-10">
+      The single biggest physical difference between OLTP and OLAP. Format follows function.
+    </p>
+
+    <div class="grid md:grid-cols-2 gap-4">
+      <div class="card p-6 reveal reveal-d1">
+        <div class="flex items-center justify-between mb-4">
+          <span class="tag tag-cyan">ROW-BASED · OLTP</span>
+          <span class="text-xs text-slate-500 mono">good for point reads</span>
+        </div>
+        <svg viewBox="0 0 280 150" class="w-full">
+          <g font-family="JetBrains Mono" font-size="10">
+            <rect x="10" y="10" width="260" height="22" fill="rgba(34,211,238,0.12)" stroke="#22D3EE" stroke-width="1"/>
+            <text x="25" y="26" fill="#22D3EE">id</text>
+            <text x="100" y="26" fill="#22D3EE">name</text>
+            <text x="200" y="26" fill="#22D3EE">price</text>
+            <rect x="10" y="34" width="260" height="22" fill="rgba(255,255,255,0.03)" stroke="#334155" stroke-width="0.5"/>
+            <text x="25" y="50" fill="#94A3B8">1</text>
+            <text x="100" y="50" fill="#94A3B8">Mug</text>
+            <text x="200" y="50" fill="#94A3B8">12.00</text>
+            <rect x="10" y="58" width="260" height="22" fill="rgba(255,255,255,0.03)" stroke="#334155" stroke-width="0.5"/>
+            <text x="25" y="74" fill="#94A3B8">2</text>
+            <text x="100" y="74" fill="#94A3B8">Book</text>
+            <text x="200" y="74" fill="#94A3B8">8.50</text>
+            <rect x="10" y="82" width="260" height="22" fill="rgba(255,255,255,0.03)" stroke="#334155" stroke-width="0.5"/>
+            <text x="25" y="98" fill="#94A3B8">3</text>
+            <text x="100" y="98" fill="#94A3B8">Pen</text>
+            <text x="200" y="98" fill="#94A3B8">1.20</text>
+          </g>
+          <text x="140" y="130" text-anchor="middle" fill="#22D3EE" font-size="10" font-family="JetBrains Mono">SELECT * WHERE id = 2</text>
+          <text x="140" y="144" text-anchor="middle" fill="#64748B" font-size="9">one row read · fast</text>
+        </svg>
+      </div>
+
+      <div class="card p-6 reveal reveal-d2">
+        <div class="flex items-center justify-between mb-4">
+          <span class="tag tag-green">COLUMNAR · OLAP</span>
+          <span class="text-xs text-slate-500 mono">good for scans</span>
+        </div>
+        <svg viewBox="0 0 280 150" class="w-full">
+          <g font-family="JetBrains Mono" font-size="10">
+            <rect x="10" y="10" width="80" height="94" fill="rgba(52,211,153,0.12)" stroke="#34D399" stroke-width="1"/>
+            <text x="50" y="28" text-anchor="middle" fill="#34D399">id</text>
+            <text x="50" y="50" text-anchor="middle" fill="#94A3B8">1</text>
+            <text x="50" y="72" text-anchor="middle" fill="#94A3B8">2</text>
+            <text x="50" y="94" text-anchor="middle" fill="#94A3B8">3</text>
+            <rect x="100" y="10" width="80" height="94" fill="rgba(255,255,255,0.03)" stroke="#334155" stroke-width="0.5"/>
+            <text x="140" y="28" text-anchor="middle" fill="#94A3B8">name</text>
+            <text x="140" y="50" text-anchor="middle" fill="#94A3B8">Mug</text>
+            <text x="140" y="72" text-anchor="middle" fill="#94A3B8">Book</text>
+            <text x="140" y="94" text-anchor="middle" fill="#94A3B8">Pen</text>
+            <rect x="190" y="10" width="80" height="94" fill="rgba(52,211,153,0.12)" stroke="#34D399" stroke-width="1"/>
+            <text x="230" y="28" text-anchor="middle" fill="#34D399">price</text>
+            <text x="230" y="50" text-anchor="middle" fill="#94A3B8">12.00</text>
+            <text x="230" y="72" text-anchor="middle" fill="#94A3B8">8.50</text>
+            <text x="230" y="94" text-anchor="middle" fill="#94A3B8">1.20</text>
+          </g>
+          <text x="140" y="130" text-anchor="middle" fill="#34D399" font-size="10" font-family="JetBrains Mono">SUM(price)</text>
+          <text x="140" y="144" text-anchor="middle" fill="#64748B" font-size="9">one column read · compressed · fast</text>
+        </svg>
+      </div>
+    </div>
+
+    <div class="grid sm:grid-cols-3 gap-3 mt-4">
+      <div class="card p-4 reveal reveal-d3">
+        <div class="text-xs text-slate-500 mono mb-1">ROW STORAGE</div>
+        <div class="text-sm text-slate-300">Reads entire rows. Wastes I/O when you only need one column.</div>
+      </div>
+      <div class="card p-4 reveal reveal-d4">
+        <div class="text-xs text-slate-500 mono mb-1">COLUMNAR</div>
+        <div class="text-sm text-slate-300">Reads only the columns you ask for. 10–100x faster scans.</div>
+      </div>
+      <div class="card p-4 reveal reveal-d5">
+        <div class="text-xs text-slate-500 mono mb-1">COMPRESSION</div>
+        <div class="text-sm text-slate-300">Similar values cluster together. Run-length + dictionary encoding shrink data 5–10x.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- COMPARISON TABLE -->
+<section class="relative py-16">
+  <div class="max-w-6xl mx-auto px-6">
+    <div class="reveal"><span class="section-tag">07 · Side by Side</span></div>
+    <h2 class="reveal reveal-d1 mt-3 text-3xl md:text-4xl font-bold mb-4">OLTP vs OLAP, the cheat sheet.</h2>
+    <p class="reveal reveal-d2 text-slate-400 max-w-2xl mb-10">
+      Different problems, different tools. Pick the right one for each workload.
+    </p>
+
+    <div class="card overflow-hidden reveal reveal-d2">
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="border-b border-slate-700">
+              <th class="text-left p-4 text-slate-400 font-medium">Dimension</th>
+              <th class="text-left p-4 text-cyan-300 font-semibold">OLTP</th>
+              <th class="text-left p-4 text-emerald-300 font-semibold">OLAP</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-800">
+            <tr class="hover:bg-slate-800/30 transition"><td class="p-4 text-slate-400">Purpose</td><td class="p-4">Run the business live</td><td class="p-4">Understand the business</td></tr>
+            <tr class="hover:bg-slate-800/30 transition"><td class="p-4 text-slate-400">Workload</td><td class="p-4">Short read/write txns</td><td class="p-4">Long aggregate scans</td></tr>
+            <tr class="hover:bg-slate-800/30 transition"><td class="p-4 text-slate-400">Query complexity</td><td class="p-4">Simple, indexed lookups</td><td class="p-4">Complex joins, windows</td></tr>
+            <tr class="hover:bg-slate-800/30 transition"><td class="p-4 text-slate-400">Latency target</td><td class="p-4"><span class="text-cyan-300 mono">~ 5–50 ms</span></td><td class="p-4"><span class="text-emerald-300 mono">~ seconds to minutes</span></td></tr>
+            <tr class="hover:bg-slate-800/30 transition"><td class="p-4 text-slate-400">Users</td><td class="p-4">Thousands to millions</td><td class="p-4">Dozens of analysts</td></tr>
+            <tr class="hover:bg-slate-800/30 transition"><td class="p-4 text-slate-400">Data scope</td><td class="p-4">Current state</td><td class="p-4">Years of history</td></tr>
+            <tr class="hover:bg-slate-800/30 transition"><td class="p-4 text-slate-400">Schema</td><td class="p-4">Normalized (3NF)</td><td class="p-4">Star / snowflake</td></tr>
+            <tr class="hover:bg-slate-800/30 transition"><td class="p-4 text-slate-400">Storage format</td><td class="p-4">Row-based</td><td class="p-4">Columnar, compressed</td></tr>
+            <tr class="hover:bg-slate-800/30 transition"><td class="p-4 text-slate-400">Index strategy</td><td class="p-4">Many B-Tree indexes</td><td class="p-4">Sparse, partition pruning</td></tr>
+            <tr class="hover:bg-slate-800/30 transition"><td class="p-4 text-slate-400">Consistency</td><td class="p-4">ACID, strict</td><td class="p-4">Eventual, relaxed</td></tr>
+            <tr class="hover:bg-slate-800/30 transition"><td class="p-4 text-slate-400">Writes</td><td class="p-4">Frequent, small</td><td class="p-4">Bulk, batched, append</td></tr>
+            <tr class="hover:bg-slate-800/30 transition"><td class="p-4 text-slate-400">Examples</td><td class="p-4 text-xs">PostgreSQL · MySQL · DynamoDB · MongoDB · Oracle</td><td class="p-4 text-xs">BigQuery · Snowflake · ClickHouse · Redshift · DuckDB</td></tr>
+            <tr class="hover:bg-slate-800/30 transition"><td class="p-4 text-slate-400">Cost model</td><td class="p-4">Provisioned compute</td><td class="p-4">Pay-per-scan or per-second</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ADVANTAGES -->
+<section class="relative py-16">
+  <div class="max-w-6xl mx-auto px-6">
+    <div class="reveal"><span class="section-tag">08 · Why Split Them</span></div>
+    <h2 class="reveal reveal-d1 mt-3 text-3xl md:text-4xl font-bold mb-4">Benefits of separation.</h2>
+    <p class="reveal reveal-d2 text-slate-400 max-w-2xl mb-10">
+      Two systems cost more to operate. But they pay for themselves fast.
+    </p>
+
+    <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div class="card card-hover p-5 reveal reveal-d1">
+        <div class="w-10 h-10 rounded-lg bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center mb-4">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#22D3EE" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+        </div>
+        <h3 class="font-semibold mb-2">Performance Isolation</h3>
+        <p class="text-xs text-slate-400">A runaway analytics query cannot lock up checkout. Each side protects the other.</p>
+      </div>
+      <div class="card card-hover p-5 reveal reveal-d2">
+        <div class="w-10 h-10 rounded-lg bg-green-500/10 border border-green-500/30 flex items-center justify-center mb-4">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#34D399" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"/></svg>
+        </div>
+        <h3 class="font-semibold mb-2">Independent Scaling</h3>
+        <p class="text-xs text-slate-400">Scale OLTP vertically for low latency. Scale OLAP horizontally for scan throughput.</p>
+      </div>
+      <div class="card card-hover p-5 reveal reveal-d3">
+        <div class="w-10 h-10 rounded-lg bg-yellow-500/10 border border-yellow-500/30 flex items-center justify-center mb-4">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FBBF24" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h7"/></svg>
+        </div>
+        <h3 class="font-semibold mb-2">Schema Freedom</h3>
+        <p class="text-xs text-slate-400">Normalize for writes on OLTP. Denormalize into star schema for OLAP. Each gets what it needs.</p>
+      </div>
+      <div class="card card-hover p-5 reveal reveal-d4">
+        <div class="w-10 h-10 rounded-lg bg-blue-500/10 border border-blue-500/30 flex items-center justify-center mb-4">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#60A5FA" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M16 8h-6a2 2 0 100 4h4a2 2 0 110 4H8"/></svg>
+        </div>
+        <h3 class="font-semibold mb-2">Cost Optimization</h3>
+        <p class="text-xs text-slate-400">OLTP on provisioned instances. OLAP on serverless, pay-per-scan. Match spend to usage.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- TRADE-OFFS -->
+<section class="relative py-16">
+  <div class="max-w-6xl mx-auto px-6">
+    <div class="reveal"><span class="section-tag">09 · Trade-offs</span></div>
+    <h2 class="reveal reveal-d1 mt-3 text-3xl md:text-4xl font-bold mb-4">Nothing is free.</h2>
+    <p class="reveal reveal-d2 text-slate-400 max-w-2xl mb-10">
+      Two systems mean two of everything: schemas, pipelines, ops, costs.
+    </p>
+
+    <div class="grid md:grid-cols-2 gap-6">
+      <div class="card p-6 reveal reveal-d1" style="border-color: rgba(52,211,153,0.2);">
+        <div class="flex items-center gap-2 mb-4">
+          <span class="tag tag-green">PROS</span>
+        </div>
+        <ul class="space-y-3 text-sm">
+          <li class="flex gap-3">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#34D399" stroke-width="2.5" class="flex-shrink-0 mt-0.5"><path d="M20 6L9 17l-5-5"/></svg>
+            <span>Operational stability — analytics cannot break production</span>
+          </li>
+          <li class="flex gap-3">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#34D399" stroke-width="2.5" class="flex-shrink-0 mt-0.5"><path d="M20 6L9 17l-5-5"/></svg>
+            <span>Right tool for each workload (row vs columnar)</span>
+          </li>
+          <li class="flex gap-3">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#34D399" stroke-width="2.5" class="flex-shrink-0 mt-0.5"><path d="M20 6L9 17l-5-5"/></svg>
+            <span>Independent scaling and cost tuning</span>
+          </li>
+          <li class="flex gap-3">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#34D399" stroke-width="2.5" class="flex-shrink-0 mt-0.5"><path d="M20 6L9 17l-5-5"/></svg>
+            <span>Schema evolution decoupled</span>
+          </li>
+          <li class="flex gap-3">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#34D399" stroke-width="2.5" class="flex-shrink-0 mt-0.5"><path d="M20 6L9 17l-5-5"/></svg>
+            <span>Long retention without bloating OLTP</span>
+          </li>
+        </ul>
+      </div>
+
+      <div class="card p-6 reveal reveal-d2" style="border-color: rgba(239,68,68,0.2);">
+        <div class="flex items-center gap-2 mb-4">
+          <span class="tag tag-red">CONS</span>
+        </div>
+        <ul class="space-y-3 text-sm">
+          <li class="flex gap-3">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#F87171" stroke-width="2.5" class="flex-shrink-0 mt-0.5"><path d="M18 6L6 18M6 6l12 12"/></svg>
+            <span>Data freshness lag (seconds to hours)</span>
+          </li>
+          <li class="flex gap-3">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#F87171" stroke-width="2.5" class="flex-shrink-0 mt-0.5"><path d="M18 6L6 18M6 6l12 12"/></svg>
+            <span>Pipeline complexity — CDC, ETL, schema drift</span>
+          </li>
+          <li class="flex gap-3">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#F87171" stroke-width="2.5" class="flex-shrink-0 mt-0.5"><path d="M18 6L6 18M6 6l12 12"/></svg>
+            <span>Two sources of truth — consistency challenges</span>
+          </li>
+          <li class="flex gap-3">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#F87171" stroke-width="2.5" class="flex-shrink-0 mt-0.5"><path d="M18 6L6 18M6 6l12 12"/></svg>
+            <span>Higher infra cost at small scale</span>
+          </li>
+          <li class="flex gap-3">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#F87171" stroke-width="2.5" class="flex-shrink-0 mt-0.5"><path d="M18 6L6 18M6 6l12 12"/></svg>
+            <span>Two teams, two mental models, two SLAs</span>
+          </li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="card p-5 mt-6 reveal reveal-d3" style="border-color: rgba(251,191,36,0.2);">
+      <div class="flex items-start gap-3">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FBBF24" stroke-width="2" class="flex-shrink-0 mt-0.5"><path d="M12 9v4M12 17h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>
+        <div class="text-sm text-slate-300">
+          <span class="font-semibold text-yellow-300">Rule of thumb:</span> If your analytics query takes &gt; 200ms on production, it is time to split. Below that, you may be fine with a read replica.
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- COMMON MISTAKES -->
+<section class="relative py-16">
+  <div class="max-w-6xl mx-auto px-6">
+    <div class="reveal"><span class="section-tag">10 · Common Mistakes</span></div>
+    <h2 class="reveal reveal-d1 mt-3 text-3xl md:text-4xl font-bold mb-4">Anti-patterns to avoid.</h2>
+    <p class="reveal reveal-d2 text-slate-400 max-w-2xl mb-10">
+      These will haunt you. Every single one.
+    </p>
+
+    <div class="grid md:grid-cols-2 gap-4">
+      <div class="card p-5 reveal reveal-d1" style="border-color: rgba(239,68,68,0.2);">
+        <div class="flex items-center gap-2 mb-3">
+          <span class="tag tag-red">ANTI-PATTERN</span>
+          <span class="text-xs text-slate-500 mono">#1</span>
+        </div>
+        <h3 class="font-semibold mb-2">Heavy analytics on the production DB</h3>
+        <p class="text-xs text-slate-400 mb-3">The CEO runs a 5-year sales report. Checkouts fail. Pager goes off.</p>
+        <div class="text-xs text-emerald-300 mono">→ Fix: Move analytics to OLAP, or at least a read replica.</div>
+      </div>
+
+      <div class="card p-5 reveal reveal-d2" style="border-color: rgba(239,68,68,0.2);">
+        <div class="flex items-center gap-2 mb-3">
+          <span class="tag tag-red">ANTI-PATTERN</span>
+          <span class="text-xs text-slate-500 mono">#2</span>
+        </div>
+        <h3 class="font-semibold mb-2">Synchronous ETL inside the write path</h3>
+        <p class="text-xs text-slate-400 mb-3">Writing to OLAP before responding to the user. Latency doubles.</p>
+        <div class="text-xs text-emerald-300 mono">→ Fix: Always async. Use CDC + queue. Never block writes.</div>
+      </div>
+
+      <div class="card p-5 reveal reveal-d3" style="border-color: rgba(239,68,68,0.2);">
+        <div class="flex items-center gap-2 mb-3">
+          <span class="tag tag-red">ANTI-PATTERN</span>
+          <span class="text-xs text-slate-500 mono">#3</span>
+        </div>
+        <h3 class="font-semibold mb-2">Using OLAP as a source of truth</h3>
+        <p class="text-xs text-slate-400 mb-3">Reading "current balance" from OLAP for a payment decision. It is stale by minutes.</p>
+        <div class="text-xs text-emerald-300 mono">→ Fix: OLTP is the source of truth. OLAP is a derived view.</div>
+      </div>
+
+      <div class="card p-5 reveal reveal-d4" style="border-color: rgba(239,68,68,0.2);">
+        <div class="flex items-center gap-2 mb-3">
+          <span class="tag tag-red">ANTI-PATTERN</span>
+          <span class="text-xs text-slate-500 mono">#4</span>
+        </div>
+        <h3 class="font-semibold mb-2">No partitioning on OLAP tables</h3>
+        <p class="text-xs text-slate-400 mb-3">Billions of rows in one unpartitioned table. Every query full-scans.</p>
+        <div class="text-xs text-emerald-300 mono">→ Fix: Partition by date. Cluster by common filter columns.</div>
+      </div>
+
+      <div class="card p-5 reveal reveal-d4" style="border-color: rgba(239,68,68,0.2);">
+        <div class="flex items-center gap-2 mb-3">
+          <span class="tag tag-red">ANTI-PATTERN</span>
+          <span class="text-xs text-slate-500 mono">#5</span>
+        </div>
+        <h3 class="font-semibold mb-2">Treating OLAP like OLTP for indexing</h3>
+        <p class="text-xs text-slate-400 mb-3">Adding B-Tree indexes on every column. Slows loads, does not help scans.</p>
+        <div class="text-xs text-emerald-300 mono">→ Fix: Use sort keys, partition keys, materialized views.</div>
+      </div>
+
+      <div class="card p-5 reveal reveal-d4" style="border-color: rgba(239,68,68,0.2);">
+        <div class="flex items-center gap-2 mb-3">
+          <span class="tag tag-red">ANTI-PATTERN</span>
+          <span class="text-xs text-slate-500 mono">#6</span>
+        </div>
+        <h3 class="font-semibold mb-2">No schema contract between sides</h3>
+        <p class="text-xs text-slate-400 mb-3">OLTP changes a column. OLAP pipelines silently break or lose data.</p>
+        <div class="text-xs text-emerald-300 mono">→ Fix: Schema registry. Contracts. Tests on every change.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- MODERN APPROACHES -->
+<section class="relative py-16">
+  <div class="max-w-6xl mx-auto px-6">
+    <div class="reveal"><span class="section-tag">11 · Modern Approaches · </span></div>
+    <h2 class="reveal reveal-d1 mt-3 text-3xl md:text-4xl font-bold mb-4">The lines are blurring.</h2>
+    <p class="reveal reveal-d2 text-slate-400 max-w-2xl mb-10">
+      Newer systems try to do both. Each has a sweet spot — and a cost.
+    </p>
+
+    <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div class="card card-hover p-5 reveal reveal-d1">
+        <div class="flex items-center gap-2 mb-3">
+          <span class="tag tag-purple">HTAP</span>
+        </div>
+        <h3 class="font-semibold mb-2">Hybrid TP + AP in one engine</h3>
+        <p class="text-xs text-slate-400 mb-3">One database, row + columnar storage under the hood. Real-time analytics without a pipeline.</p>
+        <div class="text-xs text-slate-500 mb-2">TiDB · SingleStore · CockroachDB · AlloyDB</div>
+        <div class="text-xs text-yellow-300 mono">Best for: real-time analytics on live data</div>
+      </div>
+
+      <div class="card card-hover p-5 reveal reveal-d2">
+        <div class="flex items-center gap-2 mb-3">
+          <span class="tag tag-blue">Lakehouse</span>
+        </div>
+        <h3 class="font-semibold mb-2">Open table formats on object storage</h3>
+        <p class="text-xs text-slate-400 mb-3">Cheap storage, ACID transactions, multiple engines query the same data.</p>
+        <div class="text-xs text-slate-500 mb-2">Iceberg · Delta Lake · Hudi · Databricks</div>
+        <div class="text-xs text-yellow-300 mono">Best for: petabyte-scale, multi-engine</div>
+      </div>
+
+      <div class="card card-hover p-5 reveal reveal-d3">
+        <div class="flex items-center gap-2 mb-3">
+          <span class="tag tag-cyan">Streaming OLAP</span>
+        </div>
+        <h3 class="font-semibold mb-2">Real-time ingest + sub-second queries</h3>
+        <p class="text-xs text-slate-400 mb-3">Ingest from Kafka directly. Materialized views refresh in milliseconds.</p>
+        <div class="text-xs text-slate-500 mb-2">ClickHouse · Materialize · RisingWave · Druid</div>
+        <div class="text-xs text-yellow-300 mono">Best for: dashboards with &lt; 1s freshness</div>
+      </div>
+    </div>
+
+    <div class="card p-5 mt-6 reveal reveal-d4">
+      <div class="flex items-start gap-3">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#A78BFA" stroke-width="2" class="flex-shrink-0 mt-0.5"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
+        <div class="text-sm text-slate-300">
+          <span class="font-semibold text-purple-300"> reality:</span> Most companies still run OLTP + OLAP separately, but stream CDC into a lakehouse layer for near-real-time analytics. Best of all worlds — at the cost of complexity.
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- PRACTICAL EXAMPLE -->
+<section class="relative py-16">
+  <div class="max-w-6xl mx-auto px-6">
+    <div class="reveal"><span class="section-tag">12 · Practical Example</span></div>
+    <h2 class="reveal reveal-d1 mt-3 text-3xl md:text-4xl font-bold mb-4">E-commerce, end to end.</h2>
+    <p class="reveal reveal-d2 text-slate-400 max-w-2xl mb-10">
+      A user orders a coffee mug. Two queries, two systems, one outcome.
+    </p>
+
+    <div class="grid md:grid-cols-2 gap-4">
+      <div class="card p-5 reveal reveal-d1">
+        <div class="flex items-center justify-between mb-3">
+          <span class="tag tag-cyan">OLTP · PostgreSQL</span>
+          <span class="text-xs text-slate-500 mono">~ 12ms</span>
+        </div>
+<div class="code-block"><span class="com">-- User checks out. Fast, ACID.</span>
+<span class="kw">BEGIN</span>;
+
+<span class="kw">INSERT INTO</span> orders (id, user_id, total, status)
+<span class="kw">VALUES</span> (<span class="str">'ord_8821'</span>, <span class="str">'u_42'</span>, <span class="num">42.00</span>, <span class="str">'paid'</span>);
+
+<span class="kw">INSERT INTO</span> order_items (order_id, sku, qty)
+<span class="kw">VALUES</span> (<span class="str">'ord_8821'</span>, <span class="str">'mug_red'</span>, <span class="num">2</span>);
+
+<span class="kw">UPDATE</span> inventory <span class="kw">SET</span> qty = qty - <span class="num">2</span>
+<span class="kw">WHERE</span> sku = <span class="str">'mug_red'</span>;
+
+<span class="kw">COMMIT</span>;
+<span class="com">-- User sees "Order confirmed"</span></div>
+      </div>
+
+      <div class="card p-5 reveal reveal-d2">
+        <div class="flex items-center justify-between mb-3">
+          <span class="tag tag-green">OLAP · BigQuery</span>
+          <span class="text-xs text-slate-500 mono">~ 2.4s · 1.2 TB scanned</span>
+        </div>
+<div class="code-block"><span class="com">-- Analyst: revenue by category, last 30d</span>
+<span class="kw">SELECT</span>
+  p.category,
+  <span class="fn">SUM</span>(oi.qty * oi.price) <span class="kw">AS</span> revenue
+<span class="kw">FROM</span> fact_order_items oi
+<span class="kw">JOIN</span> dim_products p <span class="kw">USING</span> (sku)
+<span class="kw">JOIN</span> dim_dates d <span class="kw">ON</span> oi.order_date = d.date
+<span class="kw">WHERE</span> d.year = <span class="num">2025</span>
+  <span class="kw">AND</span> d.month = <span class="num">1</span>
+<span class="kw">GROUP BY</span> p.category
+<span class="kw">ORDER BY</span> revenue <span class="kw">DESC</span>;
+<span class="com">-- Dashboard refreshes</span></div>
+      </div>
+    </div>
+
+    <div class="card p-5 mt-4 reveal reveal-d3">
+      <div class="flex items-center justify-between mb-4 flex-wrap gap-2">
+        <span class="tag tag-yellow">PIPELINE · CDC</span>
+        <span class="text-xs text-slate-500 mono">~ 5s end-to-end lag</span>
+      </div>
+      <div class="flex flex-wrap items-center gap-2 text-xs">
+        <div class="px-3 py-2 rounded-lg bg-cyan-500/10 border border-cyan-500/30 text-cyan-300 mono">Postgres WAL</div>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FBBF24" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+        <div class="px-3 py-2 rounded-lg bg-yellow-500/10 border border-yellow-500/30 text-yellow-300 mono">Debezium</div>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FBBF24" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+        <div class="px-3 py-2 rounded-lg bg-purple-500/10 border border-purple-500/30 text-purple-300 mono">Kafka topic</div>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FBBF24" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+        <div class="px-3 py-2 rounded-lg bg-yellow-500/10 border border-yellow-500/30 text-yellow-300 mono">Flink transform</div>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#34D399" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+        <div class="px-3 py-2 rounded-lg bg-green-500/10 border border-green-500/30 text-green-300 mono">BigQuery fact table</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- KEY TAKEAWAYS -->
+<section class="relative py-16">
+  <div class="max-w-6xl mx-auto px-6">
+    <div class="reveal"><span class="section-tag">13 · Key Takeaways</span></div>
+    <h2 class="reveal reveal-d1 mt-3 text-3xl md:text-4xl font-bold mb-4">Remember these.</h2>
+    <p class="reveal reveal-d2 text-slate-400 max-w-2xl mb-10">
+      Nine lessons that will save you 3 a.m. pages.
+    </p>
+
+    <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div class="card card-hover p-5 reveal reveal-d1">
+        <div class="text-3xl font-bold text-cyan-300 mb-2 mono">01</div>
+        <h3 class="font-semibold mb-2">Different jobs, different tools</h3>
+        <p class="text-xs text-slate-400">OLTP runs the business. OLAP understands it. Do not make one do both.</p>
+      </div>
+      <div class="card card-hover p-5 reveal reveal-d2">
+        <div class="text-3xl font-bold text-emerald-300 mb-2 mono">02</div>
+        <h3 class="font-semibold mb-2">Row vs columnar</h3>
+        <p class="text-xs text-slate-400">OLTP stores rows for fast writes. OLAP stores columns for fast scans. Format follows function.</p>
+      </div>
+      <div class="card card-hover p-5 reveal reveal-d3">
+        <div class="text-3xl font-bold text-yellow-300 mb-2 mono">03</div>
+        <h3 class="font-semibold mb-2">CDC is the bridge</h3>
+        <p class="text-xs text-slate-400">Stream changes from OLTP to OLAP. Never block writes for analytics.</p>
+      </div>
+      <div class="card card-hover p-5 reveal reveal-d4">
+        <div class="text-3xl font-bold text-blue-300 mb-2 mono">04</div>
+        <h3 class="font-semibold mb-2">OLTP is the source of truth</h3>
+        <p class="text-xs text-slate-400">Money, inventory, user state — read from OLTP. OLAP is a derived view.</p>
+      </div>
+      <div class="card card-hover p-5 reveal reveal-d4">
+        <div class="text-3xl font-bold text-purple-300 mb-2 mono">05</div>
+        <h3 class="font-semibold mb-2">Lag is a feature, not a bug</h3>
+        <p class="text-xs text-slate-400">Minutes of staleness on OLAP is usually fine. Decouple for resilience.</p>
+      </div>
+      <div class="card card-hover p-5 reveal reveal-d4">
+        <div class="text-3xl font-bold text-red-300 mb-2 mono">06</div>
+        <h3 class="font-semibold mb-2">Never query prod for analytics</h3>
+        <p class="text-xs text-slate-400">At minimum use a read replica. Better: ship to OLAP. Always.</p>
+      </div>
+      <div class="card card-hover p-5 reveal reveal-d4">
+        <div class="text-3xl font-bold text-cyan-300 mb-2 mono">07</div>
+        <h3 class="font-semibold mb-2">Schema is a contract</h3>
+        <p class="text-xs text-slate-400">OLTP and OLAP will diverge. Schema registry + tests prevent silent breakage.</p>
+      </div>
+      <div class="card card-hover p-5 reveal reveal-d4">
+        <div class="text-3xl font-bold text-green-300 mb-2 mono">08</div>
+        <h3 class="font-semibold mb-2">Pick the modern path</h3>
+        <p class="text-xs text-slate-400">Lakehouse + streaming OLAP is the  default. HTAP for narrow cases.</p>
+      </div>
+      <div class="card card-hover p-5 reveal reveal-d4">
+        <div class="text-3xl font-bold text-yellow-300 mb-2 mono">09</div>
+        <h3 class="font-semibold mb-2">Cost follows the workload</h3>
+        <p class="text-xs text-slate-400">Provisioned for OLTP. Pay-per-scan for OLAP. Match the model or pay 10x.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer class="relative py-12 border-t border-slate-800">
+  <div class="max-w-6xl mx-auto px-6 text-center">
+    <div class="text-2xl font-bold gradient-text mb-2">OLTP ⇄ OLAP</div>
+    <p class="text-sm text-slate-500">Built for engineers who design systems, not just write code.</p>
+    <p class="text-xs text-slate-600 mt-4 mono">System Design Visualized · </p>
+  </div>
+</footer>
+
+<script>
+  // Scroll progress bar
+  const progressBar = document.getElementById('progressBar');
+  const updateProgress = () => {
+    const h = document.documentElement;
+    const pct = (h.scrollTop / (h.scrollHeight - h.clientHeight)) * 100;
+    progressBar.style.width = pct + '%';
+  };
+  window.addEventListener('scroll', updateProgress, { passive: true });
+  updateProgress();
+
+  // Reveal on scroll
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('in');
+        observer.unobserve(entry.target);
+      }
+    });
+  }, { threshold: 0.08, rootMargin: '0px 0px -60px 0px' });
+
+  document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+</script>
+</body>
+</html>
