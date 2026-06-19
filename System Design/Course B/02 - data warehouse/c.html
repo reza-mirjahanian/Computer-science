@@ -1,0 +1,1069 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Data Warehouse — A Visual Guide</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script>
+tailwind.config = {
+  theme: {
+    extend: {
+      fontFamily: {
+        sans: ['Inter', 'sans-serif'],
+        mono: ['JetBrains Mono', 'monospace'],
+      }
+    }
+  }
+}
+</script>
+<style>
+:root{
+  --ink:#0F172A; --panel:#1E293B; --edge:#334155;
+  --blue:#3B82F6; --cyan:#06B6D4; --green:#10B981;
+  --yellow:#F59E0B; --red:#EF4444; --purple:#A78BFA;
+  --text:#F1F5F9; --muted:#94A3B8;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{font-family:'Inter',sans-serif;background:var(--ink);color:var(--text);overflow-x:hidden}
+
+/* Grid background */
+.grid-bg{
+  background-image:
+    linear-gradient(rgba(51,65,85,.16) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(51,65,85,.16) 1px,transparent 1px);
+  background-size:48px 48px;
+}
+.glow-blob{position:absolute;border-radius:50%;filter:blur(90px);opacity:.28;pointer-events:none}
+
+/* Animations */
+@keyframes flow-dash{to{stroke-dashoffset:-28}}
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-10px)}}
+@keyframes pulse-soft{0%,100%{opacity:.35}50%{opacity:.7}}
+@keyframes spin-slow{to{transform:rotate(360deg)}}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+@keyframes grow-bar{from{transform:scaleY(0)}to{transform:scaleY(1)}}
+
+.flow-arrow{stroke-dasharray:8 6;animation:flow-dash 1.4s linear infinite}
+.float-slow{animation:float 5s ease-in-out infinite}
+.pulse-soft{animation:pulse-soft 3s ease-in-out infinite}
+.blink{animation:blink 2s ease-in-out infinite}
+
+/* Reveal on scroll */
+.reveal{opacity:0;transform:translateY(28px);transition:opacity .7s cubic-bezier(.2,.7,.2,1),transform .7s cubic-bezier(.2,.7,.2,1)}
+.reveal.in{opacity:1;transform:translateY(0)}
+.reveal-stagger > *{opacity:0;transform:translateY(20px);transition:opacity .6s ease,transform .6s ease}
+.reveal-stagger.in > *{opacity:1;transform:translateY(0)}
+.reveal-stagger.in > *:nth-child(1){transition-delay:.05s}
+.reveal-stagger.in > *:nth-child(2){transition-delay:.15s}
+.reveal-stagger.in > *:nth-child(3){transition-delay:.25s}
+.reveal-stagger.in > *:nth-child(4){transition-delay:.35s}
+.reveal-stagger.in > *:nth-child(5){transition-delay:.45s}
+.reveal-stagger.in > *:nth-child(6){transition-delay:.55s}
+
+/* Card */
+.card{
+  background:linear-gradient(180deg,rgba(30,41,59,.85),rgba(15,23,42,.85));
+  border:1px solid var(--edge);
+  border-radius:16px;
+  transition:transform .25s ease,border-color .25s ease,box-shadow .25s ease;
+  backdrop-filter:blur(8px);
+}
+.card:hover{transform:translateY(-4px);border-color:rgba(59,130,246,.55);box-shadow:0 16px 50px -12px rgba(59,130,246,.28)}
+
+.chip{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;font-size:11px;font-weight:600;letter-spacing:.04em;text-transform:uppercase}
+
+.section-tag{display:inline-flex;align-items:center;gap:10px;color:var(--cyan);font-size:12px;font-weight:700;letter-spacing:.2em;text-transform:uppercase}
+.section-tag::before{content:'';width:28px;height:2px;background:linear-gradient(90deg,var(--cyan),transparent)}
+
+/* Table */
+.cmp-table{width:100%;border-collapse:separate;border-spacing:0;font-size:14px}
+.cmp-table th,.cmp-table td{padding:14px 18px;text-align:left;border-bottom:1px solid var(--edge)}
+.cmp-table th{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:700;background:rgba(15,23,42,.7)}
+.cmp-table tr.recommended{background:linear-gradient(90deg,rgba(16,185,129,.08),transparent 60%)}
+.cmp-table tr.recommended td:first-child{border-left:3px solid var(--green)}
+.cmp-table tbody tr:hover td{background:rgba(59,130,246,.06)}
+
+/* Code */
+.code-block{background:#0a0f1d;border:1px solid var(--edge);border-radius:14px;padding:22px;font-family:'JetBrains Mono',monospace;font-size:13px;line-height:1.75;overflow-x:auto;position:relative}
+.code-block::before{content:'';position:absolute;top:14px;left:14px;width:10px;height:10px;border-radius:50%;background:var(--red);box-shadow:16px 0 0 var(--yellow),32px 0 0 var(--green);opacity:.6}
+.code-block pre{padding-top:18px;margin:0}
+.tok-key{color:#c084fc}
+.tok-fn{color:#60a5fa}
+.tok-str{color:#fbbf24}
+.tok-com{color:#64748b;font-style:italic}
+.tok-num{color:#34d399}
+.tok-tbl{color:#22d3ee}
+
+/* Star schema */
+.star-node{transition:transform .3s ease,filter .3s ease;cursor:pointer;transform-origin:center;transform-box:fill-box}
+.star-node:hover{transform:scale(1.06);filter:drop-shadow(0 0 14px currentColor)}
+
+/* Stage card */
+.stage{transition:all .3s ease}
+.stage:hover{border-color:var(--cyan);box-shadow:0 0 0 1px var(--cyan),0 0 36px -8px rgba(6,182,212,.45)}
+
+/* Progress dots */
+@keyframes scroll-dot{0%{transform:translateY(0);opacity:1}100%{transform:translateY(14px);opacity:0}}
+.scroll-dot{animation:scroll-dot 1.6s ease-in-out infinite}
+
+/* Warning card */
+.warn-card{background:linear-gradient(180deg,rgba(239,68,68,.06),rgba(15,23,42,.6));border:1px solid rgba(239,68,68,.25);border-radius:14px;transition:all .25s ease}
+.warn-card:hover{border-color:rgba(239,68,68,.6);transform:translateY(-3px);box-shadow:0 12px 30px -10px rgba(239,68,68,.3)}
+
+/* Pros card */
+.pro-card{background:linear-gradient(180deg,rgba(16,185,129,.06),rgba(15,23,42,.6));border:1px solid rgba(16,185,129,.25);border-radius:14px}
+.con-card{background:linear-gradient(180deg,rgba(245,158,11,.06),rgba(15,23,42,.6));border:1px solid rgba(245,158,11,.25);border-radius:14px}
+
+@media (prefers-reduced-motion: reduce){
+  *,*::before,*::after{animation-duration:.01ms !important;animation-iteration-count:1 !important;transition-duration:.01ms !important;scroll-behavior:auto !important}
+  .reveal,.reveal-stagger > *{opacity:1;transform:none}
+}
+</style>
+</head>
+<body class="min-h-screen relative">
+
+<!-- Background -->
+<div class="fixed inset-0 grid-bg pointer-events-none opacity-40"></div>
+<div class="glow-blob" style="top:-120px;left:-120px;width:520px;height:520px;background:#3B82F6"></div>
+<div class="glow-blob" style="top:25%;right:-160px;width:440px;height:440px;background:#06B6D4"></div>
+<div class="glow-blob" style="top:60%;left:10%;width:420px;height:420px;background:#10B981"></div>
+<div class="glow-blob" style="bottom:-100px;right:20%;width:480px;height:480px;background:#A78BFA"></div>
+
+<!-- Nav -->
+<nav class="relative z-20 max-w-7xl mx-auto px-6 py-6 flex items-center justify-between">
+  <div class="flex items-center gap-3">
+    <div class="w-9 h-9 rounded-lg bg-gradient-to-br from-blue-500 to-cyan-400 flex items-center justify-center shadow-lg shadow-cyan-500/30">
+      <svg viewBox="0 0 24 24" class="w-5 h-5 text-white" fill="none" stroke="currentColor" stroke-width="2.2">
+        <ellipse cx="12" cy="5" rx="9" ry="3"/>
+        <path d="M3 5v14c0 1.66 4.03 3 9 3s9-1.34 9-3V5"/>
+        <path d="M3 12c0 1.66 4.03 3 9 3s9-1.34 9-3"/>
+      </svg>
+    </div>
+    <span class="font-bold text-lg tracking-tight">SystemDesign<span class="text-cyan-400">.guide</span></span>
+  </div>
+  <div class="hidden md:flex items-center gap-7 text-sm text-slate-400">
+    <a href="#problem" class="hover:text-cyan-400 transition">Problem</a>
+    <a href="#architecture" class="hover:text-cyan-400 transition">Architecture</a>
+    <a href="#how" class="hover:text-cyan-400 transition">How</a>
+    <a href="#tradeoffs" class="hover:text-cyan-400 transition">Trade-offs</a>
+    <a href="#compare" class="hover:text-cyan-400 transition">Compare</a>
+    <a href="#mistakes" class="hover:text-cyan-400 transition">Mistakes</a>
+  </div>
+</nav>
+
+<!-- Hero -->
+<header class="relative z-10 max-w-7xl mx-auto px-6 pt-10 pb-24">
+  <div class="grid lg:grid-cols-12 gap-12 items-center">
+    <div class="lg:col-span-7">
+      <div class="chip mb-6" style="background:rgba(6,182,212,.1);color:#06B6D4;border:1px solid rgba(6,182,212,.3)">
+        <span class="w-1.5 h-1.5 rounded-full bg-cyan-400 blink"></span>
+        Data Engineering · Fundamentals
+      </div>
+      <h1 class="text-5xl md:text-7xl font-black tracking-tight leading-[1.02]">
+        Data<br/>
+        <span class="bg-gradient-to-r from-blue-400 via-cyan-400 to-emerald-400 bg-clip-text text-transparent">Warehouse</span>
+      </h1>
+      <p class="mt-6 text-lg md:text-xl text-slate-400 max-w-xl leading-relaxed">
+        The analytical brain of an organization. Built to scan <span class="text-yellow-400 font-semibold">billions of rows</span>. 
+        Optimized for <span class="text-emerald-400 font-semibold">reads</span>, not writes.
+      </p>
+      <div class="mt-8 flex flex-wrap gap-3">
+        <a href="#architecture" class="px-6 py-3 rounded-xl bg-gradient-to-r from-blue-500 to-cyan-500 text-white font-semibold text-sm hover:shadow-lg hover:shadow-cyan-500/30 transition">
+          Explore architecture →
+        </a>
+        <a href="#compare" class="px-6 py-3 rounded-xl border border-slate-700 text-slate-200 font-semibold text-sm hover:border-cyan-400 transition">
+          Compare options
+        </a>
+      </div>
+      <div class="mt-10 flex items-center gap-6 text-xs text-slate-500">
+        <div class="flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-blue-400"></span>Request flow</div>
+        <div class="flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-emerald-400"></span>Success</div>
+        <div class="flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-yellow-400"></span>Cache / transform</div>
+        <div class="flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-red-400"></span>Failure</div>
+      </div>
+    </div>
+
+    <div class="lg:col-span-5">
+      <div class="card p-6 float-slow">
+        <div class="text-xs uppercase tracking-wider text-slate-500 mb-4 font-semibold">OLTP vs Warehouse</div>
+        <div class="grid grid-cols-2 gap-4">
+          <div class="rounded-xl p-4 border border-red-500/30 bg-red-500/5">
+            <div class="text-red-400 text-xs font-bold mb-2">OLTP DB</div>
+            <div class="text-2xl font-bold">~5 ms</div>
+            <div class="text-xs text-slate-500 mt-1">row insert</div>
+            <div class="mt-3 text-xs text-slate-400 leading-relaxed">Tuned for writes & single-row reads. Normalized. Small transactions.</div>
+          </div>
+          <div class="rounded-xl p-4 border border-emerald-500/30 bg-emerald-500/5">
+            <div class="text-emerald-400 text-xs font-bold mb-2">Warehouse</div>
+            <div class="text-2xl font-bold">~200 ms</div>
+            <div class="text-xs text-slate-500 mt-1">scan 1B rows</div>
+            <div class="mt-3 text-xs text-slate-400 leading-relaxed">Tuned for scans & aggregations. Columnar. Massive parallelism.</div>
+          </div>
+        </div>
+        <div class="mt-5 pt-4 border-t border-slate-800 text-xs text-slate-500 leading-relaxed">
+          Different workloads. Different storage. Different engines. <span class="text-cyan-400">One serves the app, the other serves the business.</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scroll indicator -->
+  <div class="mt-16 flex justify-center">
+    <div class="w-6 h-10 rounded-full border-2 border-slate-700 flex justify-center pt-2">
+      <div class="w-1 h-2 rounded-full bg-cyan-400 scroll-dot"></div>
+    </div>
+  </div>
+</header>
+
+<!-- PROBLEM -->
+<section id="problem" class="relative z-10 max-w-7xl mx-auto px-6 py-20">
+  <div class="reveal">
+    <div class="section-tag mb-4">01 · The Problem</div>
+    <h2 class="text-4xl md:text-5xl font-black tracking-tight max-w-3xl leading-tight">
+      Running analytics on your <span class="text-red-400">production database</span> is a recipe for disaster.
+    </h2>
+    <p class="mt-4 text-slate-400 max-w-2xl">Most apps store data in OLTP databases. They're great for fast writes. They're terrible when the CEO asks "what were our top 10 products last quarter?"</p>
+  </div>
+
+  <div class="reveal reveal-stagger mt-12 grid md:grid-cols-2 lg:grid-cols-4 gap-5">
+    <div class="card p-6">
+      <div class="w-10 h-10 rounded-lg bg-red-500/15 flex items-center justify-center mb-4">
+        <svg class="w-5 h-5 text-red-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+      </div>
+      <h3 class="font-bold text-lg mb-2">Analytics kills the app</h3>
+      <p class="text-sm text-slate-400 leading-relaxed">A single aggregation query locks tables. Users feel it. The dashboard wins, the customer loses.</p>
+    </div>
+    <div class="card p-6">
+      <div class="w-10 h-10 rounded-lg bg-yellow-500/15 flex items-center justify-center mb-4">
+        <svg class="w-5 h-5 text-yellow-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15 15 0 010 20"/></svg>
+      </div>
+      <h3 class="font-bold text-lg mb-2">Data is scattered</h3>
+      <p class="text-sm text-slate-400 leading-relaxed">Orders in Postgres. Events in Kafka. CRM in SaaS. Spreadsheets on laptops. No single view.</p>
+    </div>
+    <div class="card p-6">
+      <div class="w-10 h-10 rounded-lg bg-blue-500/15 flex items-center justify-center mb-4">
+        <svg class="w-5 h-5 text-blue-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 8v4l3 3M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+      </div>
+      <h3 class="font-bold text-lg mb-2">No history</h3>
+      <p class="text-sm text-slate-400 leading-relaxed">OLTP stores the <em>current</em> state. The warehouse stores <em>every</em> state. Trend needs time.</p>
+    </div>
+    <div class="card p-6">
+      <div class="w-10 h-10 rounded-lg bg-purple-500/15 flex items-center justify-center mb-4">
+        <svg class="w-5 h-5 text-purple-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75M9 11a4 4 0 100-8 4 4 0 000 8z"/></svg>
+      </div>
+      <h3 class="font-bold text-lg mb-2">Different teams, different views</h3>
+      <p class="text-sm text-slate-400 leading-relaxed">Finance, marketing, product — each needs curated data. Not raw tables. Not 47 joins.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ARCHITECTURE -->
+<section id="architecture" class="relative z-10 max-w-7xl mx-auto px-6 py-20">
+  <div class="reveal">
+    <div class="section-tag mb-4">02 · Architecture</div>
+    <h2 class="text-4xl md:text-5xl font-black tracking-tight max-w-3xl leading-tight">
+      Four stages. <span class="text-cyan-400">One direction.</span>
+    </h2>
+    <p class="mt-4 text-slate-400 max-w-2xl">Sources feed in. The warehouse models and serves. BI tools consume. Every layer has a job.</p>
+  </div>
+
+  <!-- Main SVG architecture -->
+  <div class="reveal mt-12 card p-6 md:p-10">
+    <div class="text-xs uppercase tracking-wider text-slate-500 mb-6 font-semibold flex items-center gap-2">
+      <span class="w-2 h-2 rounded-full bg-emerald-400 blink"></span>
+      Live data flow
+    </div>
+    <svg viewBox="0 0 1100 480" class="w-full h-auto" preserveAspectRatio="xMidYMid meet">
+      <defs>
+        <linearGradient id="g-blue" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stop-color="#3B82F6"/><stop offset="1" stop-color="#1D4ED8"/>
+        </linearGradient>
+        <linearGradient id="g-cyan" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stop-color="#22D3EE"/><stop offset="1" stop-color="#0891B2"/>
+        </linearGradient>
+        <linearGradient id="g-green" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stop-color="#34D399"/><stop offset="1" stop-color="#059669"/>
+        </linearGradient>
+        <linearGradient id="g-yellow" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stop-color="#FBBF24"/><stop offset="1" stop-color="#D97706"/>
+        </linearGradient>
+        <linearGradient id="g-purple" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stop-color="#C4B5FD"/><stop offset="1" stop-color="#7C3AED"/>
+        </linearGradient>
+        <marker id="arr-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+          <path d="M0,0 L10,5 L0,10 z" fill="#3B82F6"/>
+        </marker>
+        <marker id="arr-cyan" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+          <path d="M0,0 L10,5 L0,10 z" fill="#22D3EE"/>
+        </marker>
+        <marker id="arr-green" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+          <path d="M0,0 L10,5 L0,10 z" fill="#34D399"/>
+        </marker>
+      </defs>
+
+      <!-- Stage labels -->
+      <text x="115" y="36" text-anchor="middle" fill="#64748b" font-size="11" font-weight="700" letter-spacing="2">SOURCES</text>
+      <text x="345" y="36" text-anchor="middle" fill="#64748b" font-size="11" font-weight="700" letter-spacing="2">INGESTION (ETL / ELT)</text>
+      <text x="630" y="36" text-anchor="middle" fill="#64748b" font-size="11" font-weight="700" letter-spacing="2">WAREHOUSE</text>
+      <text x="940" y="36" text-anchor="middle" fill="#64748b" font-size="11" font-weight="700" letter-spacing="2">CONSUMERS</text>
+
+      <!-- Sources column -->
+      <g>
+        <!-- OLTP -->
+        <rect x="40" y="70" width="150" height="56" rx="10" fill="url(#g-blue)" opacity=".15" stroke="#3B82F6" stroke-width="1.4"/>
+        <text x="115" y="95" text-anchor="middle" fill="#DBEAFE" font-size="13" font-weight="700">OLTP DB</text>
+        <text x="115" y="112" text-anchor="middle" fill="#93C5FD" font-size="10">Postgres · MySQL</text>
+        <!-- API -->
+        <rect x="40" y="146" width="150" height="56" rx="10" fill="url(#g-blue)" opacity=".15" stroke="#3B82F6" stroke-width="1.4"/>
+        <text x="115" y="171" text-anchor="middle" fill="#DBEAFE" font-size="13" font-weight="700">REST APIs</text>
+        <text x="115" y="188" text-anchor="middle" fill="#93C5FD" font-size="10">Salesforce · Stripe</text>
+        <!-- Logs -->
+        <rect x="40" y="222" width="150" height="56" rx="10" fill="url(#g-blue)" opacity=".15" stroke="#3B82F6" stroke-width="1.4"/>
+        <text x="115" y="247" text-anchor="middle" fill="#DBEAFE" font-size="13" font-weight="700">Event Logs</text>
+        <text x="115" y="264" text-anchor="middle" fill="#93C5FD" font-size="10">Kafka · Kinesis</text>
+        <!-- Files -->
+        <rect x="40" y="298" width="150" height="56" rx="10" fill="url(#g-blue)" opacity=".15" stroke="#3B82F6" stroke-width="1.4"/>
+        <text x="115" y="323" text-anchor="middle" fill="#DBEAFE" font-size="13" font-weight="700">Files / CSV</text>
+        <text x="115" y="340" text-anchor="middle" fill="#93C5FD" font-size="10">S3 · Google Sheets</text>
+      </g>
+
+      <!-- Flow arrows sources -> ingestion -->
+      <g stroke="#3B82F6" stroke-width="2" fill="none" marker-end="url(#arr-blue)">
+        <path class="flow-arrow" d="M190,98 C220,98 230,150 250,170"/>
+        <path class="flow-arrow" d="M190,174 C220,174 230,180 250,195" style="animation-delay:.2s"/>
+        <path class="flow-arrow" d="M190,250 C220,250 230,220 250,220" style="animation-delay:.4s"/>
+        <path class="flow-arrow" d="M190,326 C220,326 230,260 250,245" style="animation-delay:.6s"/>
+      </g>
+
+      <!-- ETL pipeline box -->
+      <rect x="250" y="100" width="190" height="280" rx="14" fill="rgba(245,158,11,.04)" stroke="#F59E0B" stroke-width="1.4" stroke-dasharray="4 4"/>
+      <text x="345" y="125" text-anchor="middle" fill="#FBBF24" font-size="11" font-weight="700" letter-spacing="1.5">PIPELINE</text>
+
+      <!-- Extract -->
+      <rect x="270" y="140" width="150" height="50" rx="8" fill="url(#g-yellow)" opacity=".2" stroke="#F59E0B" stroke-width="1.4"/>
+      <text x="345" y="162" text-anchor="middle" fill="#FDE68A" font-size="12" font-weight="700">① Extract</text>
+      <text x="345" y="178" text-anchor="middle" fill="#FCD34D" font-size="9">pull from sources</text>
+      <!-- Transform -->
+      <rect x="270" y="210" width="150" height="50" rx="8" fill="url(#g-yellow)" opacity=".2" stroke="#F59E0B" stroke-width="1.4"/>
+      <text x="345" y="232" text-anchor="middle" fill="#FDE68A" font-size="12" font-weight="700">② Transform</text>
+      <text x="345" y="248" text-anchor="middle" fill="#FCD34D" font-size="9">clean · join · model</text>
+      <!-- Load -->
+      <rect x="270" y="280" width="150" height="50" rx="8" fill="url(#g-yellow)" opacity=".2" stroke="#F59E0B" stroke-width="1.4"/>
+      <text x="345" y="302" text-anchor="middle" fill="#FDE68A" font-size="12" font-weight="700">③ Load</text>
+      <text x="345" y="318" text-anchor="middle" fill="#FCD34D" font-size="9">write to warehouse</text>
+      <!-- internal arrows -->
+      <path d="M345,190 L345,208" stroke="#F59E0B" stroke-width="1.5" fill="none" marker-end="url(#arr-blue)" opacity=".6"/>
+      <path d="M345,260 L345,278" stroke="#F59E0B" stroke-width="1.5" fill="none" marker-end="url(#arr-blue)" opacity=".6"/>
+
+      <!-- Flow arrows ingestion -> warehouse -->
+      <g stroke="#22D3EE" stroke-width="2.4" fill="none" marker-end="url(#arr-cyan)">
+        <path class="flow-arrow" d="M420,240 C470,240 480,210 510,210"/>
+      </g>
+
+      <!-- Warehouse cylinder -->
+      <g>
+        <!-- outer glow -->
+        <ellipse cx="630" cy="80" rx="120" ry="20" fill="#22D3EE" opacity=".08"/>
+        <!-- cylinder body -->
+        <path d="M510,100 L510,360 C510,375 565,388 630,388 C695,388 750,375 750,360 L750,100" fill="url(#g-cyan)" opacity=".18" stroke="#22D3EE" stroke-width="1.8"/>
+        <!-- top ellipse -->
+        <ellipse cx="630" cy="100" rx="120" ry="22" fill="url(#g-cyan)" opacity=".3" stroke="#22D3EE" stroke-width="1.8"/>
+        <!-- label -->
+        <text x="630" y="96" text-anchor="middle" fill="#CFFAFE" font-size="13" font-weight="800">DATA WAREHOUSE</text>
+        <text x="630" y="113" text-anchor="middle" fill="#67E8F9" font-size="9" letter-spacing="1.5">COLUMNAR · MPP</text>
+
+        <!-- Star schema mini inside cylinder -->
+        <!-- fact table center -->
+        <rect x="580" y="215" width="100" height="40" rx="6" fill="url(#g-yellow)" opacity=".9" stroke="#FBBF24" stroke-width="1.4"/>
+        <text x="630" y="232" text-anchor="middle" fill="#1E293B" font-size="10" font-weight="800">fact_sales</text>
+        <text x="630" y="247" text-anchor="middle" fill="#78350F" font-size="8">measures · FKs</text>
+
+        <!-- dim tables -->
+        <rect x="540" y="155" width="70" height="32" rx="5" fill="url(#g-blue)" opacity=".7" stroke="#60A5FA" stroke-width="1.2"/>
+        <text x="575" y="175" text-anchor="middle" fill="#DBEAFE" font-size="9" font-weight="700">dim_date</text>
+
+        <rect x="650" y="155" width="70" height="32" rx="5" fill="url(#g-blue)" opacity=".7" stroke="#60A5FA" stroke-width="1.2"/>
+        <text x="685" y="175" text-anchor="middle" fill="#DBEAFE" font-size="9" font-weight="700">dim_product</text>
+
+        <rect x="540" y="283" width="70" height="32" rx="5" fill="url(#g-blue)" opacity=".7" stroke="#60A5FA" stroke-width="1.2"/>
+        <text x="575" y="303" text-anchor="middle" fill="#DBEAFE" font-size="9" font-weight="700">dim_customer</text>
+
+        <rect x="650" y="283" width="70" height="32" rx="5" fill="url(#g-blue)" opacity=".7" stroke="#60A5FA" stroke-width="1.2"/>
+        <text x="685" y="303" text-anchor="middle" fill="#DBEAFE" font-size="9" font-weight="700">dim_store</text>
+
+        <!-- star lines -->
+        <g stroke="#22D3EE" stroke-width="1.2" opacity=".6" stroke-dasharray="3 3">
+          <line x1="575" y1="187" x2="600" y2="215"/>
+          <line x1="685" y1="187" x2="660" y2="215"/>
+          <line x1="575" y1="283" x2="600" y2="255"/>
+          <line x1="685" y1="283" x2="660" y2="255"/>
+        </g>
+
+        <!-- storage layers hint -->
+        <line x1="510" y1="335" x2="750" y2="335" stroke="#22D3EE" stroke-width=".8" opacity=".3" stroke-dasharray="2 4"/>
+        <text x="630" y="355" text-anchor="middle" fill="#67E8F9" font-size="8" opacity=".7">raw · staging · curated</text>
+      </g>
+
+      <!-- Flow arrows warehouse -> consumers -->
+      <g stroke="#34D399" stroke-width="2.4" fill="none" marker-end="url(#arr-green)">
+        <path class="flow-arrow" d="M750,140 C800,140 810,98 840,98" style="animation-delay:.1s"/>
+        <path class="flow-arrow" d="M750,180 C800,180 810,174 840,174" style="animation-delay:.3s"/>
+        <path class="flow-arrow" d="M750,255 C800,255 810,250 840,250" style="animation-delay:.5s"/>
+        <path class="flow-arrow" d="M750,310 C800,310 810,326 840,326" style="animation-delay:.7s"/>
+      </g>
+
+      <!-- Consumers -->
+      <g>
+        <rect x="840" y="70" width="170" height="56" rx="10" fill="url(#g-green)" opacity=".15" stroke="#10B981" stroke-width="1.4"/>
+        <text x="925" y="95" text-anchor="middle" fill="#A7F3D0" font-size="13" font-weight="700">BI Dashboards</text>
+        <text x="925" y="112" text-anchor="middle" fill="#6EE7B7" font-size="10">Looker · Tableau</text>
+
+        <rect x="840" y="146" width="170" height="56" rx="10" fill="url(#g-green)" opacity=".15" stroke="#10B981" stroke-width="1.4"/>
+        <text x="925" y="171" text-anchor="middle" fill="#A7F3D0" font-size="13" font-weight="700">ML / Feature Store</text>
+        <text x="925" y="188" text-anchor="middle" fill="#6EE7B7" font-size="10">training pipelines</text>
+
+        <rect x="840" y="222" width="170" height="56" rx="10" fill="url(#g-green)" opacity=".15" stroke="#10B981" stroke-width="1.4"/>
+        <text x="925" y="247" text-anchor="middle" fill="#A7F3D0" font-size="13" font-weight="700">Reports / Slack</text>
+        <text x="925" y="264" text-anchor="middle" fill="#6EE7B7" font-size="10">scheduled digests</text>
+
+        <rect x="840" y="298" width="170" height="56" rx="10" fill="url(#g-green)" opacity=".15" stroke="#10B981" stroke-width="1.4"/>
+        <text x="925" y="323" text-anchor="middle" fill="#A7F3D0" font-size="13" font-weight="700">Ad-hoc SQL</text>
+        <text x="925" y="340" text-anchor="middle" fill="#6EE7B7" font-size="10">analysts · engineers</text>
+      </g>
+
+      <!-- Bottom legend -->
+      <g transform="translate(40,430)">
+        <rect x="0" y="0" width="14" height="10" rx="2" fill="#3B82F6" opacity=".5"/>
+        <text x="20" y="9" fill="#94A3B8" font-size="10">Source systems</text>
+        <rect x="160" y="0" width="14" height="10" rx="2" fill="#F59E0B" opacity=".5"/>
+        <text x="180" y="9" fill="#94A3B8" font-size="10">ETL / ELT pipeline</text>
+        <rect x="340" y="0" width="14" height="10" rx="2" fill="#22D3EE" opacity=".5"/>
+        <text x="360" y="9" fill="#94A3B8" font-size="10">Warehouse (columnar)</text>
+        <rect x="540" y="0" width="14" height="10" rx="2" fill="#10B981" opacity=".5"/>
+        <text x="560" y="9" fill="#94A3B8" font-size="10">Consumers</text>
+      </g>
+    </svg>
+  </div>
+
+  <!-- Stage cards -->
+  <div class="reveal reveal-stagger mt-8 grid md:grid-cols-2 lg:grid-cols-4 gap-5">
+    <div class="card stage p-5">
+      <div class="flex items-center gap-3 mb-3">
+        <div class="w-8 h-8 rounded-lg bg-blue-500/20 flex items-center justify-center text-blue-400 font-black text-sm">1</div>
+        <div class="text-xs uppercase tracking-wider text-slate-500 font-bold">Sources</div>
+      </div>
+      <p class="text-sm text-slate-300 leading-relaxed">Heterogeneous systems. Different formats. Different speeds. Each speaks its own dialect.</p>
+    </div>
+    <div class="card stage p-5">
+      <div class="flex items-center gap-3 mb-3">
+        <div class="w-8 h-8 rounded-lg bg-yellow-500/20 flex items-center justify-center text-yellow-400 font-black text-sm">2</div>
+        <div class="text-xs uppercase tracking-wider text-slate-500 font-bold">Ingestion</div>
+      </div>
+      <p class="text-sm text-slate-300 leading-relaxed">Extract, transform, load. Or extract, load, transform (ELT). Tools: Airflow, dbt, Fivetran.</p>
+    </div>
+    <div class="card stage p-5">
+      <div class="flex items-center gap-3 mb-3">
+        <div class="w-8 h-8 rounded-lg bg-cyan-500/20 flex items-center justify-center text-cyan-400 font-black text-sm">3</div>
+        <div class="text-xs uppercase tracking-wider text-slate-500 font-bold">Warehouse</div>
+      </div>
+      <p class="text-sm text-slate-300 leading-relaxed">Columnar storage. Massively parallel processing (MPP). Modeled as star or snowflake.</p>
+    </div>
+    <div class="card stage p-5">
+      <div class="flex items-center gap-3 mb-3">
+        <div class="w-8 h-8 rounded-lg bg-emerald-500/20 flex items-center justify-center text-emerald-400 font-black text-sm">4</div>
+        <div class="text-xs uppercase tracking-wider text-slate-500 font-bold">Consumers</div>
+      </div>
+      <p class="text-sm text-slate-300 leading-relaxed">BI tools, ML pipelines, reports, ad-hoc SQL. All speak the same SQL dialect.</p>
+    </div>
+  </div>
+</section>
+
+<!-- HOW IT WORKS -->
+<section id="how" class="relative z-10 max-w-7xl mx-auto px-6 py-20">
+  <div class="reveal">
+    <div class="section-tag mb-4">03 · How It Works</div>
+    <h2 class="text-4xl md:text-5xl font-black tracking-tight max-w-3xl leading-tight">
+      A query travels through <span class="text-cyan-400">five layers.</span>
+    </h2>
+    <p class="mt-4 text-slate-400 max-w-2xl">From raw source to insight on a dashboard — here's the journey of one row.</p>
+  </div>
+
+  <div class="reveal mt-12 relative">
+    <!-- vertical line -->
+    <div class="absolute left-6 md:left-8 top-2 bottom-2 w-px bg-gradient-to-b from-blue-500 via-yellow-500 via-cyan-500 to-emerald-500 opacity-40"></div>
+
+    <div class="space-y-6">
+      <!-- Step 1 -->
+      <div class="flex gap-5 items-start">
+        <div class="flex-shrink-0 w-12 h-12 md:w-16 md:h-16 rounded-2xl bg-blue-500/15 border border-blue-500/40 flex items-center justify-center font-black text-blue-400 text-xl shadow-lg shadow-blue-500/20">01</div>
+        <div class="card p-5 flex-1">
+          <div class="flex items-center gap-3 mb-2">
+            <h3 class="font-bold text-lg text-blue-400">Extract</h3>
+            <span class="chip" style="background:rgba(59,130,246,.12);color:#93C5FD">CDC · batch · API</span>
+          </div>
+          <p class="text-sm text-slate-300 leading-relaxed">Pull data from sources. Use CDC (change data capture) for low-latency, or batch for simplicity. Don't hammer the source — backoff is your friend.</p>
+        </div>
+      </div>
+      <!-- Step 2 -->
+      <div class="flex gap-5 items-start">
+        <div class="flex-shrink-0 w-12 h-12 md:w-16 md:h-16 rounded-2xl bg-yellow-500/15 border border-yellow-500/40 flex items-center justify-center font-black text-yellow-400 text-xl shadow-lg shadow-yellow-500/20">02</div>
+        <div class="card p-5 flex-1">
+          <div class="flex items-center gap-3 mb-2">
+            <h3 class="font-bold text-lg text-yellow-400">Stage</h3>
+            <span class="chip" style="background:rgba(245,158,11,.12);color:#FCD34D">raw · immutable</span>
+          </div>
+          <p class="text-sm text-slate-300 leading-relaxed">Land raw data unchanged in a staging schema. This is your rewind button. If downstream logic breaks, you can replay from here.</p>
+        </div>
+      </div>
+      <!-- Step 3 -->
+      <div class="flex gap-5 items-start">
+        <div class="flex-shrink-0 w-12 h-12 md:w-16 md:h-16 rounded-2xl bg-yellow-500/15 border border-yellow-500/40 flex items-center justify-center font-black text-yellow-400 text-xl shadow-lg shadow-yellow-500/20">03</div>
+        <div class="card p-5 flex-1">
+          <div class="flex items-center gap-3 mb-2">
+            <h3 class="font-bold text-lg text-yellow-400">Transform</h3>
+            <span class="chip" style="background:rgba(245,158,11,.12);color:#FCD34D">dbt · Spark · SQL</span>
+          </div>
+          <p class="text-sm text-slate-300 leading-relaxed">Clean, dedupe, cast types, join, aggregate. Build dimension and fact tables. Make data <em>trustworthy</em> — not just available.</p>
+        </div>
+      </div>
+      <!-- Step 4 -->
+      <div class="flex gap-5 items-start">
+        <div class="flex-shrink-0 w-12 h-12 md:w-16 md:h-16 rounded-2xl bg-cyan-500/15 border border-cyan-500/40 flex items-center justify-center font-black text-cyan-400 text-xl shadow-lg shadow-cyan-500/20">04</div>
+        <div class="card p-5 flex-1">
+          <div class="flex items-center gap-3 mb-2">
+            <h3 class="font-bold text-lg text-cyan-400">Serve</h3>
+            <span class="chip" style="background:rgba(6,182,212,.12);color:#67E8F9">marts · semantics</span>
+          </div>
+          <p class="text-sm text-slate-300 leading-relaxed">Expose curated tables in data marts — one per business domain. Add a semantic layer so "revenue" means the same thing everywhere.</p>
+        </div>
+      </div>
+      <!-- Step 5 -->
+      <div class="flex gap-5 items-start">
+        <div class="flex-shrink-0 w-12 h-12 md:w-16 md:h-16 rounded-2xl bg-emerald-500/15 border border-emerald-500/40 flex items-center justify-center font-black text-emerald-400 text-xl shadow-lg shadow-emerald-500/20">05</div>
+        <div class="card p-5 flex-1">
+          <div class="flex items-center gap-3 mb-2">
+            <h3 class="font-bold text-lg text-emerald-400">Consume</h3>
+            <span class="chip" style="background:rgba(16,185,129,.12);color:#6EE7B7">BI · ML · alerts</span>
+          </div>
+          <p class="text-sm text-slate-300 leading-relaxed">Dashboards, notebooks, ML features, scheduled reports. Cache hot queries. Throttle expensive ones. The warehouse is a shared resource — protect it.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- STAR SCHEMA -->
+<section class="relative z-10 max-w-7xl mx-auto px-6 py-20">
+  <div class="reveal">
+    <div class="section-tag mb-4">04 · Modeling</div>
+    <h2 class="text-4xl md:text-5xl font-black tracking-tight max-w-3xl leading-tight">
+      The <span class="text-yellow-400">star schema</span> is the warehouse's native shape.
+    </h2>
+    <p class="mt-4 text-slate-400 max-w-2xl">One fact table in the middle. Dimensions radiate out. Few joins, fast scans, easy for humans to read.</p>
+  </div>
+
+  <div class="reveal mt-12 grid lg:grid-cols-5 gap-8 items-center">
+    <!-- Star schema SVG -->
+    <div class="lg:col-span-3 card p-6">
+      <div class="text-xs uppercase tracking-wider text-slate-500 mb-4 font-semibold">Star schema · fact_sales</div>
+      <svg viewBox="0 0 600 460" class="w-full h-auto">
+        <defs>
+          <linearGradient id="fact-g" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" stop-color="#FBBF24"/><stop offset="1" stop-color="#D97706"/>
+          </linearGradient>
+          <linearGradient id="dim-g" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" stop-color="#60A5FA"/><stop offset="1" stop-color="#2563EB"/>
+          </linearGradient>
+        </defs>
+
+        <!-- Lines (drawn first, behind nodes) -->
+        <g stroke="#475569" stroke-width="1.6" stroke-dasharray="5 4" opacity=".7">
+          <line x1="300" y1="230" x2="300" y2="100"/>
+          <line x1="300" y1="230" x2="500" y2="230"/>
+          <line x1="300" y1="230" x2="300" y2="380"/>
+          <line x1="300" y1="230" x2="100" y2="230"/>
+        </g>
+
+        <!-- Cardinality labels -->
+        <g font-size="10" font-weight="700" fill="#94A3B8">
+          <text x="312" y="170">N : 1</text>
+          <text x="385" y="222">N : 1</text>
+          <text x="312" y="320">N : 1</text>
+          <text x="170" y="222">N : 1</text>
+        </g>
+
+        <!-- Fact table (center) -->
+        <g class="star-node" style="color:#FBBF24">
+          <rect x="220" y="200" width="160" height="60" rx="10" fill="url(#fact-g)" stroke="#FBBF24" stroke-width="2"/>
+          <text x="300" y="225" text-anchor="middle" fill="#1E293B" font-size="14" font-weight="800">fact_sales</text>
+          <text x="300" y="244" text-anchor="middle" fill="#78350F" font-size="10" font-weight="600">quantity · revenue · discount</text>
+        </g>
+
+        <!-- dim_date (top) -->
+        <g class="star-node" style="color:#60A5FA">
+          <rect x="220" y="50" width="160" height="50" rx="8" fill="url(#dim-g)" opacity=".85" stroke="#60A5FA" stroke-width="1.6"/>
+          <text x="300" y="73" text-anchor="middle" fill="#DBEAFE" font-size="13" font-weight="700">dim_date</text>
+          <text x="300" y="89" text-anchor="middle" fill="#BFDBFE" font-size="9">day · month · quarter · year</text>
+        </g>
+
+        <!-- dim_product (right) -->
+        <g class="star-node" style="color:#60A5FA">
+          <rect x="420" y="200" width="160" height="60" rx="8" fill="url(#dim-g)" opacity=".85" stroke="#60A5FA" stroke-width="1.6"/>
+          <text x="500" y="225" text-anchor="middle" fill="#DBEAFE" font-size="13" font-weight="700">dim_product</text>
+          <text x="500" y="244" text-anchor="middle" fill="#BFDBFE" font-size="9">sku · category · brand</text>
+        </g>
+
+        <!-- dim_customer (bottom) -->
+        <g class="star-node" style="color:#60A5FA">
+          <rect x="220" y="380" width="160" height="50" rx="8" fill="url(#dim-g)" opacity=".85" stroke="#60A5FA" stroke-width="1.6"/>
+          <text x="300" y="403" text-anchor="middle" fill="#DBEAFE" font-size="13" font-weight="700">dim_customer</text>
+          <text x="300" y="419" text-anchor="middle" fill="#BFDBFE" font-size="9">segment · region · tier</text>
+        </g>
+
+        <!-- dim_store (left) -->
+        <g class="star-node" style="color:#60A5FA">
+          <rect x="20" y="200" width="160" height="60" rx="8" fill="url(#dim-g)" opacity=".85" stroke="#60A5FA" stroke-width="1.6"/>
+          <text x="100" y="225" text-anchor="middle" fill="#DBEAFE" font-size="13" font-weight="700">dim_store</text>
+          <text x="100" y="244" text-anchor="middle" fill="#BFDBFE" font-size="9">city · country · format</text>
+        </g>
+      </svg>
+    </div>
+
+    <!-- Explanation -->
+    <div class="lg:col-span-2 space-y-4">
+      <div class="card p-5">
+        <div class="flex items-start gap-3">
+          <div class="w-10 h-10 rounded-lg bg-yellow-500/15 flex items-center justify-center flex-shrink-0">
+            <div class="w-4 h-4 rounded-sm bg-yellow-400"></div>
+          </div>
+          <div>
+            <h3 class="font-bold mb-1">Fact table</h3>
+            <p class="text-sm text-slate-400 leading-relaxed">Holds <em>events</em> and <em>measures</em>. Tons of rows. Mostly numeric. Foreign keys to dimensions. Grows fast.</p>
+          </div>
+        </div>
+      </div>
+      <div class="card p-5">
+        <div class="flex items-start gap-3">
+          <div class="w-10 h-10 rounded-lg bg-blue-500/15 flex items-center justify-center flex-shrink-0">
+            <div class="w-4 h-4 rounded-sm bg-blue-400"></div>
+          </div>
+          <div>
+            <h3 class="font-bold mb-1">Dimension tables</h3>
+            <p class="text-sm text-slate-400 leading-relaxed">Holds <em>context</em>. The "who, what, where, when." Smaller. Mostly text. Changes slowly.</p>
+          </div>
+        </div>
+      </div>
+      <div class="card p-5">
+        <div class="flex items-start gap-3">
+          <div class="w-10 h-10 rounded-lg bg-emerald-500/15 flex items-center justify-center flex-shrink-0">
+            <svg class="w-5 h-5 text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+          </div>
+          <div>
+            <h3 class="font-bold mb-1">Why it works</h3>
+            <p class="text-sm text-slate-400 leading-relaxed">Columnar engines love wide, denormalized dimensions. One hop from fact to dim. The optimizer can prune aggressively.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Code snippet -->
+  <div class="reveal mt-8 grid lg:grid-cols-2 gap-6">
+    <div>
+      <div class="text-xs uppercase tracking-wider text-slate-500 mb-3 font-semibold">Example query · top categories last quarter</div>
+      <div class="code-block">
+<pre><span class="tok-com">-- Revenue by category, last quarter</span>
+<span class="tok-key">SELECT</span>
+  p.category,
+  c.region,
+  <span class="tok-fn">SUM</span>(f.quantity * f.unit_price) <span class="tok-key">AS</span> revenue
+<span class="tok-key">FROM</span> <span class="tok-tbl">fact_sales</span>    f
+<span class="tok-key">JOIN</span> <span class="tok-tbl">dim_product</span>  p <span class="tok-key">USING</span> (product_id)
+<span class="tok-key">JOIN</span> <span class="tok-tbl">dim_customer</span> c <span class="tok-key">USING</span> (customer_id)
+<span class="tok-key">JOIN</span> <span class="tok-tbl">dim_date</span>      d <span class="tok-key">USING</span> (date_id)
+<span class="tok-key">WHERE</span> d.quarter = <span class="tok-str">'2024-Q4'</span>
+<span class="tok-key">GROUP BY</span> p.category, c.region
+<span class="tok-key">ORDER BY</span> revenue <span class="tok-key">DESC</span>
+<span class="tok-key">LIMIT</span> <span class="tok-num">10</span>;</pre>
+      </div>
+    </div>
+    <div>
+      <div class="text-xs uppercase tracking-wider text-slate-500 mb-3 font-semibold">dbt model · dimension with SCD Type 2</div>
+      <div class="code-block">
+<pre><span class="tok-com">-- models/dim_customer.sql</span>
+<span class="tok-key">WITH</span> src <span class="tok-key">AS</span> (
+  <span class="tok-key">SELECT</span> *, <span class="tok-fn">ROW_NUMBER</span>() <span class="tok-key">OVER</span> (
+    <span class="tok-key">PARTITION BY</span> id <span class="tok-key">ORDER BY</span> updated_at
+  ) <span class="tok-key">AS</span> rn
+  <span class="tok-key">FROM</span> <span class="tok-tbl">staging.customers</span>
+)
+<span class="tok-key">SELECT</span>
+  id          <span class="tok-key">AS</span> customer_key,
+  id          <span class="tok-key">AS</span> customer_id,
+  email, segment, region,
+  <span class="tok-fn">VALID_FROM</span>(updated_at) <span class="tok-key">AS</span> valid_from,
+  <span class="tok-fn">VALID_TO</span>(updated_at)   <span class="tok-key">AS</span> valid_to
+<span class="tok-key">FROM</span> src <span class="tok-key">WHERE</span> rn = <span class="tok-num">1</span></pre>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- TRADE-OFFS -->
+<section id="tradeoffs" class="relative z-10 max-w-7xl mx-auto px-6 py-20">
+  <div class="reveal">
+    <div class="section-tag mb-4">05 · Trade-offs</div>
+    <h2 class="text-4xl md:text-5xl font-black tracking-tight max-w-3xl leading-tight">
+      Powerful. Expensive. <span class="text-yellow-400">Not for everything.</span>
+    </h2>
+    <p class="mt-4 text-slate-400 max-w-2xl">A warehouse earns its cost when analytics matter at scale. For tiny data or pure blob storage, look elsewhere.</p>
+  </div>
+
+  <div class="reveal mt-12 grid md:grid-cols-2 gap-6">
+    <!-- Pros -->
+    <div class="pro-card p-6">
+      <div class="flex items-center gap-3 mb-5">
+        <div class="w-10 h-10 rounded-lg bg-emerald-500/20 flex items-center justify-center">
+          <svg class="w-5 h-5 text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 13l4 4L19 7"/></svg>
+        </div>
+        <h3 class="font-black text-xl text-emerald-400">Strengths</h3>
+      </div>
+      <ul class="space-y-3 text-sm">
+        <li class="flex gap-3"><span class="text-emerald-400 font-bold">→</span><span><b>Scan speed:</b> columnar + MPP scans billions of rows in seconds.</span></li>
+        <li class="flex gap-3"><span class="text-emerald-400 font-bold">→</span><span><b>Single source of truth:</b> everyone queries the same modeled tables.</span></li>
+        <li class="flex gap-3"><span class="text-emerald-400 font-bold">→</span><span><b>Historical depth:</b> years of snapshots, not just current state.</span></li>
+        <li class="flex gap-3"><span class="text-emerald-400 font-bold">→</span><span><b>ACID guarantees:</b> reliable, consistent, auditable.</span></li>
+        <li class="flex gap-3"><span class="text-emerald-400 font-bold">→</span><span><b>SQL ecosystem:</b> every BI tool speaks SQL. Plug and play.</span></li>
+        <li class="flex gap-3"><span class="text-emerald-400 font-bold">→</span><span><b>Governance:</b> row-level security, lineage, access control built in.</span></li>
+      </ul>
+    </div>
+    <!-- Cons -->
+    <div class="con-card p-6">
+      <div class="flex items-center gap-3 mb-5">
+        <div class="w-10 h-10 rounded-lg bg-yellow-500/20 flex items-center justify-center">
+          <svg class="w-5 h-5 text-yellow-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 9v4M12 17h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>
+        </div>
+        <h3 class="font-black text-xl text-yellow-400">Costs & limits</h3>
+      </div>
+      <ul class="space-y-3 text-sm">
+        <li class="flex gap-3"><span class="text-yellow-400 font-bold">→</span><span><b>Price:</b> storage + compute is expensive at scale. Idle warehouses still cost.</span></li>
+        <li class="flex gap-3"><span class="text-yellow-400 font-bold">→</span><span><b>Latency:</b> batch ETL means data is minutes to hours stale. Not real-time.</span></li>
+        <li class="flex gap-3"><span class="text-yellow-400 font-bold">→</span><span><b>Schema rigidity:</b> schema-on-write hurts when sources change often.</span></li>
+        <li class="flex gap-3"><span class="text-yellow-400 font-bold">→</span><span><b>ETL complexity:</b> pipelines break. Backfills hurt. Maintenance is real work.</span></li>
+        <li class="flex gap-3"><span class="text-yellow-400 font-bold">→</span><span><b>Bad fit for unstructured:</b> images, video, free text — use a lake instead.</span></li>
+        <li class="flex gap-3"><span class="text-yellow-400 font-bold">→</span><span><b>Not for OLTP:</b> no high-frequency writes. Don't put your app behind it.</span></li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- COMPARISON -->
+<section id="compare" class="relative z-10 max-w-7xl mx-auto px-6 py-20">
+  <div class="reveal">
+    <div class="section-tag mb-4">06 · Comparison</div>
+    <h2 class="text-4xl md:text-5xl font-black tracking-tight max-w-3xl leading-tight">
+      Warehouse vs Lake vs Mart vs OLTP.
+    </h2>
+    <p class="mt-4 text-slate-400 max-w-2xl">Four siblings. Different jobs. Knowing which to pick is half the architecture.</p>
+  </div>
+
+  <div class="reveal mt-10 card overflow-hidden">
+    <div class="overflow-x-auto">
+      <table class="cmp-table">
+        <thead>
+          <tr>
+            <th>Aspect</th>
+            <th>Data Warehouse</th>
+            <th>Data Lake</th>
+            <th>Data Mart</th>
+            <th>OLTP DB</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="font-semibold text-slate-200">Purpose</td>
+            <td class="text-slate-300">Org-wide analytics</td>
+            <td class="text-slate-300">Raw / unstructured storage</td>
+            <td class="text-slate-300">Team-specific analytics</td>
+            <td class="text-slate-300">App transactions</td>
+          </tr>
+          <tr>
+            <td class="font-semibold text-slate-200">Data type</td>
+            <td class="text-slate-300">Structured, curated</td>
+            <td class="text-slate-300">Any — structured, semi, binary</td>
+            <td class="text-slate-300">Curated subset</td>
+            <td class="text-slate-300">Operational, current</td>
+          </tr>
+          <tr>
+            <td class="font-semibold text-slate-200">Schema</td>
+            <td class="text-slate-300">Schema-on-write</td>
+            <td class="text-slate-300">Schema-on-read</td>
+            <td class="text-slate-300">Schema-on-write</td>
+            <td class="text-slate-300">Schema-on-write</td>
+          </tr>
+          <tr>
+            <td class="font-semibold text-slate-200">Storage</td>
+            <td class="text-slate-300">Columnar</td>
+            <td class="text-slate-300">Object store (Parquet, JSON)</td>
+            <td class="text-slate-300">Columnar or row</td>
+            <td class="text-slate-300">Row-based</td>
+          </tr>
+          <tr>
+            <td class="font-semibold text-slate-200">Users</td>
+            <td class="text-slate-300">Analysts · BI · ML</td>
+            <td class="text-slate-300">Data scientists · engineers</td>
+            <td class="text-slate-300">Business team</td>
+            <td class="text-slate-300">Application</td>
+          </tr>
+          <tr>
+            <td class="font-semibold text-slate-200">Latency</td>
+            <td class="text-slate-300">Seconds to minutes</td>
+            <td class="text-slate-300">Minutes to hours</td>
+            <td class="text-slate-300">Seconds</td>
+            <td class="text-slate-300">Milliseconds</td>
+          </tr>
+          <tr>
+            <td class="font-semibold text-slate-200">Cost</td>
+            <td class="text-slate-300">High</td>
+            <td class="text-slate-300">Low (storage) · pay per query</td>
+            <td class="text-slate-300">Medium</td>
+            <td class="text-slate-300">Low–Medium</td>
+          </tr>
+          <tr>
+            <td class="font-semibold text-slate-200">Examples</td>
+            <td class="text-slate-300">Snowflake · BigQuery · Redshift</td>
+            <td class="text-slate-300">S3 · Azure ADLS · GCS</td>
+            <td class="text-slate-300">Warehouse subset / cube</td>
+            <td class="text-slate-300">Postgres · MySQL · DynamoDB</td>
+          </tr>
+          <tr class="recommended">
+            <td class="font-semibold text-emerald-300">Best for</td>
+            <td class="text-emerald-200">✓ Structured analytics at scale</td>
+            <td class="text-slate-400">Raw archive · ML feature mining</td>
+            <td class="text-slate-400">Department-level reporting</td>
+            <td class="text-slate-400">Running the product</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Recommendation -->
+  <div class="reveal mt-6 grid md:grid-cols-3 gap-5">
+    <div class="card p-5 border-emerald-500/30">
+      <div class="text-xs uppercase tracking-wider text-emerald-400 mb-2 font-bold">Recommended</div>
+      <h3 class="font-bold text-lg mb-2">Lakehouse pattern</h3>
+      <p class="text-sm text-slate-400 leading-relaxed">Lake for raw + warehouse for curated. Use Iceberg / Delta Lake to get ACID on object storage. Best of both worlds.</p>
+    </div>
+    <div class="card p-5">
+      <div class="text-xs uppercase tracking-wider text-cyan-400 mb-2 font-bold">Modern stack</div>
+      <h3 class="font-bold text-lg mb-2">Cloud-native warehouse</h3>
+      <p class="text-sm text-slate-400 leading-relaxed">Snowflake, BigQuery, Redshift. Decoupled storage & compute. Scale to zero. Pay per query.</p>
+    </div>
+    <div class="card p-5">
+      <div class="text-xs uppercase tracking-wider text-purple-400 mb-2 font-bold">Avoid</div>
+      <h3 class="font-bold text-lg mb-2">OLAP on OLTP</h3>
+      <p class="text-sm text-slate-400 leading-relaxed">Don't run heavy aggregations on your production Postgres. Use a replica at minimum — but a real warehouse is the right answer.</p>
+    </div>
+  </div>
+</section>
+
+<!-- COMMON MISTAKES -->
+<section id="mistakes" class="relative z-10 max-w-7xl mx-auto px-6 py-20">
+  <div class="reveal">
+    <div class="section-tag mb-4">07 · Common Mistakes</div>
+    <h2 class="text-4xl md:text-5xl font-black tracking-tight max-w-3xl leading-tight">
+      Where warehouses <span class="text-red-400">go wrong.</span>
+    </h2>
+    <p class="mt-4 text-slate-400 max-w-2xl">Most warehouse failures aren't engine problems. They're modeling, governance, and pipeline problems.</p>
+  </div>
+
+  <div class="reveal reveal-stagger mt-12 grid md:grid-cols-2 lg:grid-cols-3 gap-5">
+    <div class="warn-card p-5">
+      <div class="flex items-center gap-2 mb-3">
+        <svg class="w-5 h-5 text-red-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        <h3 class="font-bold text-red-300">3NF everywhere</h3>
+      </div>
+      <p class="text-sm text-slate-400 leading-relaxed">Normalizing for analytics means 12 joins per query. The optimizer suffers. Use star schemas instead.</p>
+      <div class="mt-3 text-xs text-red-400 font-semibold">Fix: model as star or snowflake.</div>
+    </div>
+
+    <div class="warn-card p-5">
+      <div class="flex items-center gap-2 mb-3">
+        <svg class="w-5 h-5 text-red-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        <h3 class="font-bold text-red-300">No SCD strategy</h3>
+      </div>
+      <p class="text-sm text-slate-400 leading-relaxed">Customer upgrades from "free" to "pro". Your historical revenue now attributes to "pro". History is broken.</p>
+      <div class="mt-3 text-xs text-red-400 font-semibold">Fix: Slowly Changing Dimensions Type 2.</div>
+    </div>
+
+    <div class="warn-card p-5">
+      <div class="flex items-center gap-2 mb-3">
+        <svg class="w-5 h-5 text-red-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        <h3 class="font-bold text-red-300">Loading unvalidated data</h3>
+      </div>
+      <p class="text-sm text-slate-400 leading-relaxed">Bad source data flows straight into fact tables. Dashboards show negative revenue. Trust dies fast.</p>
+      <div class="mt-3 text-xs text-red-400 font-semibold">Fix: tests in dbt. Reject bad rows before publishing.</div>
+    </div>
+
+    <div class="warn-card p-5">
+      <div class="flex items-center gap-2 mb-3">
+        <svg class="w-5 h-5 text-red-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        <h3 class="font-bold text-red-300">No partitioning</h3>
+      </div>
+      <p class="text-sm text-slate-400 leading-relaxed">Fact table is 5 billion rows. Every query scans all of them. Credit card bill explodes.</p>
+      <div class="mt-3 text-xs text-red-400 font-semibold">Fix: partition by date. Cluster by common filter.</div>
+    </div>
+
+    <div class="warn-card p-5">
+      <div class="flex items-center gap-2 mb-3">
+        <svg class="w-5 h-5 text-red-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        <h3 class="font-bold text-red-300">Two definitions of "revenue"</h3>
+      </div>
+      <p class="text-sm text-slate-400 leading-relaxed">Finance says $4M. Marketing says $5M. Same data, different filters. Meetings turn into forensics.</p>
+      <div class="mt-3 text-xs text-red-400 font-semibold">Fix: centralized semantic layer + metrics.</div>
+    </div>
+
+    <div class="warn-card p-5">
+      <div class="flex items-center gap-2 mb-3">
+        <svg class="w-5 h-5 text-red-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        <h3 class="font-bold text-red-300">Treating it as real-time</h3>
+      </div>
+      <p class="text-sm text-slate-400 leading-relaxed">Stakeholders demand "fresh" data. You shrink the batch window to 1 minute. Pipeline thrashes. Costs explode.</p>
+      <div class="mt-3 text-xs text-red-400 font-semibold">Fix: use a streaming layer (Kafka + materialized views) for hot paths.</div>
+    </div>
+  </div>
+</section>
+
+<!-- KEY TAKEAWAYS -->
+<section class="relative z-10 max-w-7xl mx-auto px-6 py-20">
+  <div class="reveal">
+    <div class="section-tag mb-4">08 · Key Takeaways</div>
+    <h2 class="text-4xl md:text-5xl font-black tracking-tight max-w-3xl leading-tight">
+      Remember these <span class="text-cyan-4 00">seven things.</span>
+    </h2>
+  </div>
+
+  <div class="reveal reveal-stagger mt-12 grid md:grid-cols-2 lg:grid-cols-3 gap-5">
+    <div class="card p-6">
+      <div class="text-5xl font-black bg-gradient-to-br from-blue-400 to-cyan-300 bg-clip-text text-transparent mb-3">01</div>
+      <h3 class="font-bold text-lg mb-2">Separate OLTP from OLAP</h3>
+      <p class="text-sm text-slate-400 leading-relaxed">They optimize for opposite things. Mixing them compromises both.</p>
+    </div>
+    <div class="card p-6">
+      <div class="text-5xl font-black bg-gradient-to-br from-cyan-400 to-emerald-300 bg-clip-text text-transparent mb-3">02</div>
+      <h3 class="font-bold text-lg mb-2">Columnar beats row for scans</h3>
+      <p class="text-sm text-slate-400 leading-relaxed">Read only the columns you need. Compression is better. Aggregations fly.</p>
+    </div>
+    <div class="card p-6">
+      <div class="text-5xl font-black bg-gradient-to-br from-emerald-400 to-yellow-300 bg-clip-text text-transparent mb-3">03</div>
+      <h3 class="font-bold text-lg mb-2">Star schema is the default</h3>
+      <p class="text-sm text-slate-400 leading-relaxed">Fact in the middle. Dimensions around. Easy for humans, fast for engines.</p>
+    </div>
+    <div class="card p-6">
+      <div class="text-5xl font-black bg-gradient-to-br from-yellow-400 to-orange-300 bg-clip-text text-transparent mb-3">04</div>
+      <h3 class="font-bold text-lg mb-2">Partition by time</h3>
+      <p class="text-sm text-slate-400 leading-relaxed">Most queries filter on date. Partitioning prunes 99% of data instantly.</p>
+    </div>
+    <div class="card p-6">
+      <div class="text-5xl font-black bg-gradient-to-br from-purple-400 to-pink-300 bg-clip-text text-transparent mb-3">05</div>
+      <h3 class="font-bold text-lg mb-2">Model for trust, not just access</h3>
+      <p class="text-sm text-slate-400 leading-relaxed">Tests, docs, lineage. If users don't trust the data, the warehouse is dead weight.</p>
+    </div>
+    <div class="card p-6">
+      <div class="text-5xl font-black bg-gradient-to-br from-pink-400 to-red-300 bg-clip-text text-transparent mb-3">06</div>
+      <h3 class="font-bold text-lg mb-2">Lakehouse is the modern shape</h3>
+      <p class="text-sm text-slate-400 leading-relaxed">Open table formats (Iceberg, Delta) blur the lake / warehouse line. Plan for both.</p>
+    </div>
+    <div class="card p-6">
+      <div class="text-5xl font-black bg-gradient-to-br from-blue-400 to-purple-300 bg-clip-text text-transparent mb-3">07</div>
+      <h3 class="font-bold text-lg mb-2">Cost is a first-class metric</h3>
+      <p class="text-sm text-slate-400 leading-relaxed">Every query costs money. Monitor, throttle, cache. Treat compute like the scarce resource it is.</p>
+    </div>
+    <div class="card p-6">
+      <div class="text-5xl font-black bg-gradient-to-br from-cyan-400 to-blue-300 bg-clip-text text-transparent mb-3">08</div>
+      <h3 class="font-bold text-lg mb-2">ELT &gt; ETL in the cloud</h3>
+      <p class="text-sm text-slate-400 leading-relaxed">Load raw, then transform in the warehouse with SQL. Faster iteration, cheaper compute.</p>
+    </div>
+    <div class="card p-6">
+      <div class="text-5xl font-black bg-gradient-to-br from-emerald-400 to-cyan-300 bg-clip-text text-transparent mb-3">09</div>
+      <h3 class="font-bold text-lg mb-2">One semantic layer to rule them all</h3>
+      <p class="text-sm text-slate-400 leading-relaxed">Define "revenue" once. Every tool sees the same number. Stop the metric wars.</p>
+    </div>
+  </div>
+</section>
+
+<!-- Footer -->
+<footer class="relative z-10 max-w-7xl mx-auto px-6 py-12 border-t border-slate-800 mt-12">
+  <div class="flex flex-col md:flex-row items-center justify-between gap-4 text-sm text-slate-500">
+    <div class="flex items-center gap-3">
+      <div class="w-7 h-7 rounded-md bg-gradient-to-br from-blue-500 to-cyan-400 flex items-center justify-center">
+        <svg viewBox="0 0 24 24" class="w-4 h-4 text-white" fill="none" stroke="currentColor" stroke-width="2.2">
+          <ellipse cx="12" cy="5" rx="9" ry="3"/>
+          <path d="M3 5v14c0 1.66 4.03 3 9 3s9-1.34 9-3V5"/>
+          <path d="M3 12c0 1.66 4.03 3 9 3s9-1.34 9-3"/>
+        </svg>
+      </div>
+      <span>SystemDesign.guide · A visual tour of engineering concepts</span>
+    </div>
+    <div class="flex items-center gap-6">
+      <span>Built with HTML · Tailwind · SVG</span>
+      <span class="text-slate-700">·</span>
+      <span>Inspired by ByteByteGo</span>
+    </div>
+  </div>
+</footer>
+
+<script>
+// Reveal on scroll using IntersectionObserver
+const io = new IntersectionObserver((entries) => {
+  entries.forEach(e => {
+    if (e.isIntersecting) {
+      e.target.classList.add('in');
+      io.unobserve(e.target);
+    }
+  });
+}, { threshold: 0.12, rootMargin: '0px 0px -40px 0px' });
+
+document.querySelectorAll('.reveal').forEach(el => io.observe(el));
+
+// Smooth anchor scroll offset
+document.querySelectorAll('a[href^="#"]').forEach(a => {
+  a.addEventListener('click', (e) => {
+    const id = a.getAttribute('href');
+    if (id.length > 1) {
+      const el = document.querySelector(id);
+      if (el) {
+        e.preventDefault();
+        const top = el.getBoundingClientRect().top + window.scrollY - 70;
+        window.scrollTo({ top, behavior: 'smooth' });
+      }
+    }
+  });
+});
+
+// Subtle parallax on glow blobs
+const blobs = document.querySelectorAll('.glow-blob');
+let mx = 0, my = 0, cx = 0, cy = 0;
+window.addEventListener('mousemove', (e) => {
+  mx = (e.clientX / window.innerWidth - 0.5) * 30;
+  my = (e.clientY / window.innerHeight - 0.5) * 30;
+});
+function raf() {
+  cx += (mx - cx) * 0.05;
+  cy += (my - cy) * 0.05;
+  blobs.forEach((b, i) => {
+    const f = (i + 1) * 0.4;
+    b.style.transform = `translate(${cx * f}px, ${cy * f}px)`;
+  });
+  requestAnimationFrame(raf);
+}
+raf();
+</script>
+</body>
+</html>
