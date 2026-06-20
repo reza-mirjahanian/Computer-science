@@ -1,0 +1,719 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Systems of Record & Derived Data — Architecture Guide</title>
+    <script src="https://cdn.tailwindcss.com">
+    </script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        surface: '#0F172A',
+                        card: '#1E293B',
+                        accent: {
+                            blue: '#38BDF8',
+                            cyan: '#22D3EE',
+                            green: '#4ADE80',
+                            yellow: '#FBBF24',
+                            red: '#F87171',
+                            purple: '#A78BFA',
+                        },
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'Fira Code', 'monospace'],
+                    },
+                    animation: {
+                        'float-slow': 'float 6s ease-in-out infinite',
+                        'float-medium': 'float 4s ease-in-out infinite',
+                        'dash-flow': 'dashFlow 1.2s linear infinite',
+                        'dash-flow-slow': 'dashFlow 2s linear infinite',
+                        'pulse-soft': 'pulseSoft 3s ease-in-out infinite',
+                    },
+                    keyframes: {
+                        float: {
+                            '0%, 100%': { transform: 'translateY(0px)' },
+                            '50%': { transform: 'translateY(-8px)' },
+                        },
+                        dashFlow: {
+                            '0%': { strokeDashoffset: '24' },
+                            '100%': { strokeDashoffset: '0' },
+                        },
+                        pulseSoft: {
+                            '0%, 100%': { opacity: '1' },
+                            '50%': { opacity: '0.6' },
+                        },
+                    },
+                },
+            },
+        };
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+        :root {
+            --bg: #0F172A;
+            --card: #1E293B;
+        }
+
+        * {
+            scroll-behavior: smooth;
+            box-sizing: border-box;
+        }
+        body {
+            background-color: #0F172A;
+            color: #E2E8F0;
+            font-family: 'Inter', system-ui, sans-serif;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* Reduced motion support */
+        @media (prefers-reduced-motion: reduce) {
+            *,
+            *::before,
+            *::after {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
+                scroll-behavior: auto !important;
+            }
+            .animated-arrow {
+                animation: none !important;
+            }
+            .float-anim {
+                animation: none !important;
+            }
+        }
+
+        /* Animated SVG arrows */
+        .flow-arrow {
+            stroke-dasharray: 8 4;
+            animation: dashFlow 0.8s linear infinite;
+        }
+        .flow-arrow-slow {
+            stroke-dasharray: 8 4;
+            animation: dashFlow 1.6s linear infinite;
+        }
+        @keyframes dashFlow {
+            0% {
+                stroke-dashoffset: 24;
+            }
+            100% {
+                stroke-dashoffset: 0;
+            }
+        }
+
+        /* Scroll reveal */
+        .reveal {
+            opacity: 0;
+            transform: translateY(24px);
+            transition: opacity 0.7s cubic-bezier(0.22, 1, 0.36, 1),
+                transform 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+        }
+        .reveal.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        .reveal-delay-1 {
+            transition-delay: 0.1s;
+        }
+        .reveal-delay-2 {
+            transition-delay: 0.2s;
+        }
+        .reveal-delay-3 {
+            transition-delay: 0.3s;
+        }
+        .reveal-delay-4 {
+            transition-delay: 0.4s;
+        }
+        .reveal-delay-5 {
+            transition-delay: 0.5s;
+        }
+
+        /* Card hover */
+        .card-hover {
+            transition: transform 0.3s cubic-bezier(0.22, 1, 0.36, 1),
+                box-shadow 0.3s cubic-bezier(0.22, 1, 0.36, 1),
+                border-color 0.3s ease;
+        }
+        .card-hover:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 20px 40px -12px rgba(0, 0, 0, 0.5);
+            border-color: rgba(56, 189, 248, 0.5);
+        }
+
+        /* Gradient text */
+        .gradient-text {
+            background: linear-gradient(135deg, #38BDF8, #22D3EE);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .gradient-text-green {
+            background: linear-gradient(135deg, #4ADE80, #22D3EE);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        /* SVG Diagram glow */
+        .glow-blue {
+            filter: drop-shadow(0 0 12px rgba(56, 189, 248, 0.35));
+        }
+        .glow-green {
+            filter: drop-shadow(0 0 10px rgba(74, 222, 128, 0.3));
+        }
+        .glow-yellow {
+            filter: drop-shadow(0 0 10px rgba(251, 191, 36, 0.3));
+        }
+
+        /* Table styles */
+        .comparison-table th {
+            font-weight: 600;
+            letter-spacing: 0.02em;
+            text-transform: uppercase;
+            font-size: 0.75rem;
+        }
+        .comparison-table td {
+            font-size: 0.875rem;
+            line-height: 1.6;
+        }
+        .comparison-table tr {
+            transition: background-color 0.2s ease;
+        }
+        .comparison-table tbody tr:hover {
+            background-color: rgba(56, 189, 248, 0.05);
+        }
+
+        /* Code snippet */
+        .code-snippet {
+            background: rgba(15, 23, 42, 0.8);
+            border: 1px solid rgba(56, 189, 248, 0.25);
+            border-radius: 8px;
+            padding: 16px 20px;
+            font-family: 'JetBrains Mono', 'Fira Code', monospace;
+            font-size: 0.8rem;
+            line-height: 1.7;
+            color: #CBD5E1;
+            overflow-x: auto;
+        }
+        .code-snippet .keyword {
+            color: #38BDF8;
+        }
+        .code-snippet .string {
+            color: #4ADE80;
+        }
+        .code-snippet .comment {
+            color: #64748B;
+        }
+        .code-snippet .fn {
+            color: #FBBF24;
+        }
+
+        /* Warning card */
+        .warning-card {
+            border-left: 3px solid #F87171;
+            background: rgba(248, 113, 113, 0.06);
+        }
+
+        /* Badge */
+        .badge {
+            display: inline-block;
+            padding: 3px 10px;
+            border-radius: 9999px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            letter-spacing: 0.03em;
+            text-transform: uppercase;
+        }
+    </style>
+</head>
+<body class="min-h-screen">
+
+    <!-- ==================== HERO ==================== -->
+    <header class="max-w-5xl mx-auto px-6 pt-20 pb-10 text-center">
+        <div class="reveal">
+            <span class="badge bg-accent-blue/15 text-accent-blue mb-4 inline-block">Architecture Fundamentals</span>
+            <h1 class="text-5xl sm:text-6xl md:text-7xl font-extrabold tracking-tight mt-4 mb-6 leading-tight">
+                Systems of <span class="gradient-text">Record</span><br>
+                <span class="text-white/80">&</span> Derived <span class="gradient-text-green">Data</span>
+            </h1>
+            <p class="text-lg sm:text-xl text-slate-400 max-w-2xl mx-auto leading-relaxed">
+                Every data system falls into one of two categories.
+                Understanding this distinction is the key to building
+                <strong class="text-white">scalable</strong>,
+                <strong class="text-white">reliable</strong> architectures.
+            </p>
+        </div>
+    </header>
+
+    <!-- ==================== TWO DEFINITION CARDS ==================== -->
+    <section class="max-w-5xl mx-auto px-6 py-8 grid md:grid-cols-2 gap-6">
+        <!-- SOR Card -->
+        <div class="reveal card-hover bg-card rounded-2xl p-7 border border-slate-700/60">
+            <div class="flex items-center gap-3 mb-4">
+                <div class="w-10 h-10 rounded-lg bg-accent-blue/20 flex items-center justify-center flex-shrink-0">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#38BDF8" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="3" x2="9" y2="21"/></svg>
+                </div>
+                <h3 class="text-xl font-bold text-white">System of Record (SOR)</h3>
+            </div>
+            <p class="text-slate-400 text-sm leading-relaxed mb-3">
+                The <strong class="text-white">authoritative source of truth</strong>.
+                Every piece of data originates here. No other system can override it.
+            </p>
+            <ul class="text-slate-400 text-sm space-y-2 mt-3">
+                <li class="flex items-start gap-2"><span class="text-accent-blue mt-0.5">▸</span> Optimized for <strong class="text-white">writes & integrity</strong></li>
+                <li class="flex items-start gap-2"><span class="text-accent-blue mt-0.5">▸</span> ACID transactions, strict consistency</li>
+                <li class="flex items-start gap-2"><span class="text-accent-blue mt-0.5">▸</span> Examples: PostgreSQL, MySQL, CRM, ERP</li>
+            </ul>
+        </div>
+
+        <!-- Derived Data Card -->
+        <div class="reveal reveal-delay-1 card-hover bg-card rounded-2xl p-7 border border-slate-700/60">
+            <div class="flex items-center gap-3 mb-4">
+                <div class="w-10 h-10 rounded-lg bg-accent-green/20 flex items-center justify-center flex-shrink-0">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#4ADE80" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                </div>
+                <h3 class="text-xl font-bold text-white">Derived Data System</h3>
+            </div>
+            <p class="text-slate-400 text-sm leading-relaxed mb-3">
+                <strong class="text-white">Consumes, transforms, and re-materializes</strong>
+                data from the SOR for specific use cases.
+            </p>
+            <ul class="text-slate-400 text-sm space-y-2 mt-3">
+                <li class="flex items-start gap-2"><span class="text-accent-green mt-0.5">▸</span> Optimized for <strong class="text-white">reads & queries</strong></li>
+                <li class="flex items-start gap-2"><span class="text-accent-green mt-0.5">▸</span> Eventual consistency acceptable</li>
+                <li class="flex items-start gap-2"><span class="text-accent-green mt-0.5">▸</span> Examples: Elasticsearch, Redis cache, Data Warehouse</li>
+            </ul>
+        </div>
+    </section>
+
+    <!-- ==================== WHY ENGINEERS CARE ==================== -->
+    <section class="max-w-5xl mx-auto px-6 py-8">
+        <div class="reveal bg-card rounded-2xl p-7 border border-slate-700/60">
+            <h3 class="text-lg font-bold text-white mb-3">🎯 Why This Matters</h3>
+            <div class="grid sm:grid-cols-3 gap-4 text-sm text-slate-400">
+                <div>
+                    <span class="text-accent-blue font-semibold">Problem:</span> Mixing SOR and derived logic in one system creates a monolith that's hard to scale.
+                </div>
+                <div>
+                    <span class="text-accent-green font-semibold">Solution:</span> Separate concerns. Let SORs handle writes; let derived systems handle specialized reads.
+                </div>
+                <div>
+                    <span class="text-accent-yellow font-semibold">Result:</span> Independent scaling, better resilience, and clear data contracts.
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ==================== ARCHITECTURE SVG DIAGRAM ==================== -->
+    <section class="max-w-5xl mx-auto px-6 py-10">
+        <div class="reveal text-center mb-6">
+            <h2 class="text-3xl sm:text-4xl font-bold text-white">How Data Flows</h2>
+            <p class="text-slate-400 mt-2 text-sm">One source of truth → many specialized views</p>
+        </div>
+        <div class="reveal reveal-delay-1 bg-card rounded-2xl p-4 sm:p-8 border border-slate-700/60 overflow-x-auto">
+            <svg viewBox="0 0 960 480" xmlns="http://www.w3.org/2000/svg" class="w-full max-w-4xl mx-auto" style="min-width:700px;">
+                <defs>
+                    <linearGradient id="gradBlue" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stop-color="#38BDF8" stop-opacity="0.25"/>
+                        <stop offset="100%" stop-color="#38BDF8" stop-opacity="0.05"/>
+                    </linearGradient>
+                    <linearGradient id="gradGreen" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stop-color="#4ADE80" stop-opacity="0.25"/>
+                        <stop offset="100%" stop-color="#4ADE80" stop-opacity="0.05"/>
+                    </linearGradient>
+                    <linearGradient id="gradYellow" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stop-color="#FBBF24" stop-opacity="0.25"/>
+                        <stop offset="100%" stop-color="#FBBF24" stop-opacity="0.05"/>
+                    </linearGradient>
+                    <linearGradient id="gradPurple" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stop-color="#A78BFA" stop-opacity="0.2"/>
+                        <stop offset="100%" stop-color="#A78BFA" stop-opacity="0.04"/>
+                    </linearGradient>
+                    <filter id="glowBlue">
+                        <feGaussianBlur stdDeviation="3" result="blur"/>
+                        <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+                    </filter>
+                    <marker id="arrowBlue" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+                        <polygon points="0 0, 8 3, 0 6" fill="#38BDF8"/>
+                    </marker>
+                    <marker id="arrowGreen" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+                        <polygon points="0 0, 8 3, 0 6" fill="#4ADE80"/>
+                    </marker>
+                    <marker id="arrowYellow" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+                        <polygon points="0 0, 8 3, 0 6" fill="#FBBF24"/>
+                    </marker>
+                    <marker id="arrowPurple" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+                        <polygon points="0 0, 8 3, 0 6" fill="#A78BFA"/>
+                    </marker>
+                </defs>
+
+                <!-- Background grid lines (subtle) -->
+                <g opacity="0.04">
+                    <line x1="0" y1="120" x2="960" y2="120" stroke="#fff" stroke-width="0.5"/>
+                    <line x1="0" y1="240" x2="960" y2="240" stroke="#fff" stroke-width="0.5"/>
+                    <line x1="0" y1="360" x2="960" y2="360" stroke="#fff" stroke-width="0.5"/>
+                    <line x1="200" y1="0" x2="200" y2="480" stroke="#fff" stroke-width="0.5"/>
+                    <line x1="480" y1="0" x2="480" y2="480" stroke="#fff" stroke-width="0.5"/>
+                    <line x1="760" y1="0" x2="760" y2="480" stroke="#fff" stroke-width="0.5"/>
+                </g>
+
+                <!-- ===== SYSTEM OF RECORD BOX ===== -->
+                <rect x="30" y="170" width="170" height="140" rx="14" fill="url(#gradBlue)" stroke="#38BDF8" stroke-width="2" class="glow-blue"/>
+                <text x="115" y="210" text-anchor="middle" fill="#38BDF8" font-size="13" font-weight="700">🗄️ System of</text>
+                <text x="115" y="232" text-anchor="middle" fill="#38BDF8" font-size="13" font-weight="700">Record</text>
+                <text x="115" y="260" text-anchor="middle" fill="#94A3B8" font-size="10">PostgreSQL / MySQL</text>
+                <text x="115" y="280" text-anchor="middle" fill="#64748B" font-size="9" font-style="italic">ACID · Source of Truth</text>
+
+                <!-- ===== CDC BOX ===== -->
+                <rect x="280" y="185" width="140" height="110" rx="12" fill="url(#gradYellow)" stroke="#FBBF24" stroke-width="1.8" class="glow-yellow"/>
+                <text x="350" y="225" text-anchor="middle" fill="#FBBF24" font-size="12" font-weight="700">⚡ CDC Pipeline</text>
+                <text x="350" y="248" text-anchor="middle" fill="#94A3B8" font-size="10">Debezium / Kafka</text>
+                <text x="350" y="268" text-anchor="middle" fill="#94A3B8" font-size="10">Connect</text>
+                <text x="350" y="288" text-anchor="middle" fill="#64748B" font-size="9" font-style="italic">Change Data Capture</text>
+
+                <!-- ===== EVENT BUS ===== -->
+                <rect x="510" y="195" width="130" height="90" rx="40" fill="url(#gradPurple)" stroke="#A78BFA" stroke-width="1.8"/>
+                <text x="575" y="236" text-anchor="middle" fill="#A78BFA" font-size="12" font-weight="700">📨 Event Bus</text>
+                <text x="575" y="258" text-anchor="middle" fill="#94A3B8" font-size="10">Kafka / Pulsar</text>
+                <text x="575" y="276" text-anchor="middle" fill="#64748B" font-size="9">Immutable Log</text>
+
+                <!-- ===== DERIVED SYSTEMS (Right side) ===== -->
+                <!-- Search Index -->
+                <rect x="720" y="70" width="150" height="70" rx="10" fill="url(#gradGreen)" stroke="#4ADE80" stroke-width="1.6" class="glow-green"/>
+                <text x="795" y="100" text-anchor="middle" fill="#4ADE80" font-size="12" font-weight="700">🔍 Search Index</text>
+                <text x="795" y="120" text-anchor="middle" fill="#94A3B8" font-size="10">Elasticsearch</text>
+
+                <!-- Cache -->
+                <rect x="720" y="165" width="150" height="70" rx="10" fill="url(#gradYellow)" stroke="#FBBF24" stroke-width="1.6" class="glow-yellow"/>
+                <text x="795" y="195" text-anchor="middle" fill="#FBBF24" font-size="12" font-weight="700">⚡ Cache</text>
+                <text x="795" y="215" text-anchor="middle" fill="#94A3B8" font-size="10">Redis</text>
+
+                <!-- Data Warehouse -->
+                <rect x="720" y="260" width="150" height="70" rx="10" fill="url(#gradBlue)" stroke="#38BDF8" stroke-width="1.6" class="glow-blue"/>
+                <text x="795" y="290" text-anchor="middle" fill="#38BDF8" font-size="12" font-weight="700">📊 Data Warehouse</text>
+                <text x="795" y="310" text-anchor="middle" fill="#94A3B8" font-size="10">Snowflake / BigQuery</text>
+
+                <!-- Read Replicas -->
+                <rect x="720" y="355" width="150" height="70" rx="10" fill="url(#gradPurple)" stroke="#A78BFA" stroke-width="1.6"/>
+                <text x="795" y="385" text-anchor="middle" fill="#A78BFA" font-size="12" font-weight="700">📖 Read Replicas</text>
+                <text x="795" y="405" text-anchor="middle" fill="#94A3B8" font-size="10">PostgreSQL Replicas</text>
+
+                <!-- ===== ANIMATED ARROWS ===== -->
+                <!-- SOR → CDC -->
+                <line x1="200" y1="240" x2="275" y2="240" stroke="#38BDF8" stroke-width="2.5" marker-end="url(#arrowBlue)" class="flow-arrow"/>
+                <text x="237" y="232" text-anchor="middle" fill="#64748B" font-size="8">WAL</text>
+
+                <!-- CDC → Event Bus -->
+                <line x1="420" y1="240" x2="505" y2="240" stroke="#FBBF24" stroke-width="2.5" marker-end="url(#arrowYellow)" class="flow-arrow-slow"/>
+                <text x="462" y="232" text-anchor="middle" fill="#64748B" font-size="8">events</text>
+
+                <!-- Event Bus → Search -->
+                <path d="M 640 220 Q 680 220 680 150 L 680 105 L 715 105" stroke="#4ADE80" stroke-width="2" fill="none" marker-end="url(#arrowGreen)" class="flow-arrow-slow"/>
+                <!-- Event Bus → Cache -->
+                <line x1="640" y1="240" x2="715" y2="200" stroke="#FBBF24" stroke-width="2" marker-end="url(#arrowYellow)" class="flow-arrow"/>
+                <!-- Event Bus → Warehouse -->
+                <line x1="640" y1="260" x2="715" y2="295" stroke="#38BDF8" stroke-width="2" marker-end="url(#arrowBlue)" class="flow-arrow-slow"/>
+                <!-- Event Bus → Read Replicas -->
+                <path d="M 640 270 Q 680 340 680 370 L 680 390 L 715 390" stroke="#A78BFA" stroke-width="2" fill="none" marker-end="url(#arrowPurple)" class="flow-arrow"/>
+
+                <!-- ===== LABELS ===== -->
+                <text x="115" y="350" text-anchor="middle" fill="#64748B" font-size="9">Writes</text>
+                <text x="575" y="320" text-anchor="middle" fill="#64748B" font-size="9">Fan-out</text>
+                <text x="795" y="450" text-anchor="middle" fill="#475569" font-size="9">Each serves a specific read pattern</text>
+
+                <!-- Bottom annotation -->
+                <rect x="280" y="420" width="400" height="40" rx="8" fill="rgba(56,189,248,0.04)" stroke="rgba(56,189,248,0.15)" stroke-width="1"/>
+                <text x="480" y="445" text-anchor="middle" fill="#64748B" font-size="10">Derived systems are <tspan fill="#FBBF24" font-weight="600">eventually consistent</tspan> — they lag behind the SOR by design</text>
+            </svg>
+        </div>
+    </section>
+
+    <!-- ==================== HOW IT WORKS — STEP BY STEP ==================== -->
+    <section class="max-w-5xl mx-auto px-6 py-10">
+        <div class="reveal text-center mb-8">
+            <h2 class="text-3xl sm:text-4xl font-bold text-white">How It Works</h2>
+            <p class="text-slate-400 mt-2 text-sm">Five steps from write to specialized read</p>
+        </div>
+        <div class="space-y-4">
+            <!-- Step 1 -->
+            <div class="reveal card-hover bg-card rounded-xl p-5 border border-slate-700/60 flex items-start gap-4">
+                <div class="w-10 h-10 rounded-full bg-accent-blue/20 flex items-center justify-center flex-shrink-0 text-accent-blue font-bold text-sm">1</div>
+                <div>
+                    <h4 class="text-white font-semibold">Write to the System of Record</h4>
+                    <p class="text-slate-400 text-sm mt-1">All mutations go through the SOR. It validates, enforces constraints, and ensures ACID compliance. No other system accepts writes directly.</p>
+                </div>
+            </div>
+            <!-- Step 2 -->
+            <div class="reveal reveal-delay-1 card-hover bg-card rounded-xl p-5 border border-slate-700/60 flex items-start gap-4">
+                <div class="w-10 h-10 rounded-full bg-accent-yellow/20 flex items-center justify-center flex-shrink-0 text-accent-yellow font-bold text-sm">2</div>
+                <div>
+                    <h4 class="text-white font-semibold">Capture the Change</h4>
+                    <p class="text-slate-400 text-sm mt-1">CDC tools like Debezium tail the database write-ahead log (WAL). Every insert, update, and delete becomes an event — immutable and ordered.</p>
+                </div>
+            </div>
+            <!-- Step 3 -->
+            <div class="reveal reveal-delay-2 card-hover bg-card rounded-xl p-5 border border-slate-700/60 flex items-start gap-4">
+                <div class="w-10 h-10 rounded-full bg-accent-purple/20 flex items-center justify-center flex-shrink-0 text-accent-purple font-bold text-sm">3</div>
+                <div>
+                    <h4 class="text-white font-semibold">Publish to the Event Bus</h4>
+                    <p class="text-slate-400 text-sm mt-1">Events land on a durable log (Kafka). Multiple consumers can read the same event stream independently — each at its own pace.</p>
+                </div>
+            </div>
+            <!-- Step 4 -->
+            <div class="reveal reveal-delay-3 card-hover bg-card rounded-xl p-5 border border-slate-700/60 flex items-start gap-4">
+                <div class="w-10 h-10 rounded-full bg-accent-green/20 flex items-center justify-center flex-shrink-0 text-accent-green font-bold text-sm">4</div>
+                <div>
+                    <h4 class="text-white font-semibold">Derived Systems Consume &amp; Transform</h4>
+                    <p class="text-slate-400 text-sm mt-1">Each derived system processes events for its purpose: indexing for search, aggregating for analytics, or caching hot data for low-latency reads.</p>
+                </div>
+            </div>
+            <!-- Step 5 -->
+            <div class="reveal reveal-delay-4 card-hover bg-card rounded-xl p-5 border border-slate-700/60 flex items-start gap-4">
+                <div class="w-10 h-10 rounded-full bg-accent-cyan/20 flex items-center justify-center flex-shrink-0 text-accent-cyan font-bold text-sm">5</div>
+                <div>
+                    <h4 class="text-white font-semibold">Serve Specialized Queries</h4>
+                    <p class="text-slate-400 text-sm mt-1">Applications query the derived system optimized for their use case. The SOR stays lean, handling only transactional writes.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ==================== TRADE-OFFS TABLE ==================== -->
+    <section class="max-w-5xl mx-auto px-6 py-10">
+        <div class="reveal text-center mb-8">
+            <h2 class="text-3xl sm:text-4xl font-bold text-white">Trade-offs</h2>
+            <p class="text-slate-400 mt-2 text-sm">Every architectural decision has a cost</p>
+        </div>
+        <div class="reveal reveal-delay-1 bg-card rounded-2xl p-5 sm:p-7 border border-slate-700/60 overflow-x-auto">
+            <table class="comparison-table w-full text-left text-slate-300 border-collapse min-w-[600px]">
+                <thead>
+                    <tr class="border-b border-slate-700">
+                        <th class="py-3 px-3 text-accent-blue text-xs">Approach</th>
+                        <th class="py-3 px-3 text-accent-green text-xs">Consistency</th>
+                        <th class="py-3 px-3 text-accent-yellow text-xs">Latency</th>
+                        <th class="py-3 px-3 text-slate-400 text-xs">Complexity</th>
+                        <th class="py-3 px-3 text-slate-400 text-xs">Best For</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr class="border-b border-slate-800">
+                        <td class="py-3 px-3 font-semibold text-white">CDC (Change Data Capture)</td>
+                        <td class="py-3 px-3">Eventual ✓</td>
+                        <td class="py-3 px-3">ms–seconds</td>
+                        <td class="py-3 px-3">Medium</td>
+                        <td class="py-3 px-3 text-accent-green font-medium">✅ Recommended</td>
+                    </tr>
+                    <tr class="border-b border-slate-800">
+                        <td class="py-3 px-3 font-semibold text-white">Dual Writes</td>
+                        <td class="py-3 px-3 text-accent-red">⚠️ Risky</td>
+                        <td class="py-3 px-3">Instant</td>
+                        <td class="py-3 px-3">Low</td>
+                        <td class="py-3 px-3">Simple apps (avoid at scale)</td>
+                    </tr>
+                    <tr class="border-b border-slate-800">
+                        <td class="py-3 px-3 font-semibold text-white">Materialized Views</td>
+                        <td class="py-3 px-3">Strong ✓</td>
+                        <td class="py-3 px-3">Instant</td>
+                        <td class="py-3 px-3">Low</td>
+                        <td class="py-3 px-3">Same-database aggregations</td>
+                    </tr>
+                    <tr class="border-b border-slate-800">
+                        <td class="py-3 px-3 font-semibold text-white">Batch ETL</td>
+                        <td class="py-3 px-3">Eventual</td>
+                        <td class="py-3 px-3">Hours</td>
+                        <td class="py-3 px-3">Medium</td>
+                        <td class="py-3 px-3">Analytics, reporting</td>
+                    </tr>
+                    <tr>
+                        <td class="py-3 px-3 font-semibold text-white">Event Sourcing</td>
+                        <td class="py-3 px-3">Eventual ✓</td>
+                        <td class="py-3 px-3">ms–seconds</td>
+                        <td class="py-3 px-3">High</td>
+                        <td class="py-3 px-3">Audit trails, complex domains</td>
+                    </tr>
+                </tbody>
+            </table>
+            <p class="text-slate-500 text-xs mt-4 px-3">✅ <span class="text-accent-green">CDC is the sweet spot</span> for most systems: low latency, manageable complexity, and battle-tested tooling.</p>
+        </div>
+    </section>
+
+    <!-- ==================== COMMON MISTAKES ==================== -->
+    <section class="max-w-5xl mx-auto px-6 py-10">
+        <div class="reveal text-center mb-8">
+            <h2 class="text-3xl sm:text-4xl font-bold text-white">Common Mistakes</h2>
+            <p class="text-slate-400 mt-2 text-sm">Anti-patterns that cause data corruption and outages</p>
+        </div>
+        <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
+            <!-- Mistake 1 -->
+            <div class="reveal warning-card card-hover bg-card rounded-xl p-5 border border-slate-700/60">
+                <div class="flex items-center gap-2 mb-3">
+                    <span class="text-accent-red text-lg">⚠️</span>
+                    <h4 class="text-white font-semibold text-sm">Writing to Derived Systems</h4>
+                </div>
+                <p class="text-slate-400 text-xs leading-relaxed">Never accept writes directly into a cache, search index, or replica. It creates split-brain and data drift.</p>
+                <div class="code-snippet mt-3 text-xs">
+                    <span class="comment">// ❌ Anti-pattern</span><br>
+                    <span class="fn">redis.set</span>(<span class="string">"user:42"</span>, data);<br>
+                    <span class="comment">// ✅ Correct: write to SOR, let CDC propagate</span>
+                </div>
+            </div>
+            <!-- Mistake 2 -->
+            <div class="reveal reveal-delay-1 warning-card card-hover bg-card rounded-xl p-5 border border-slate-700/60">
+                <div class="flex items-center gap-2 mb-3">
+                    <span class="text-accent-red text-lg">⚠️</span>
+                    <h4 class="text-white font-semibold text-sm">Treating Derived as Source</h4>
+                </div>
+                <p class="text-slate-400 text-xs leading-relaxed">A search index or cache can go stale or get wiped. Always design so you can rebuild derived data from the SOR.</p>
+                <div class="code-snippet mt-3 text-xs">
+                    <span class="comment">// Rebuild from SOR anytime</span><br>
+                    <span class="keyword">SELECT</span> * <span class="keyword">FROM</span> orders<br>
+                    <span class="keyword">WHERE</span> updated_at > :last_sync;
+                </div>
+            </div>
+            <!-- Mistake 3 -->
+            <div class="reveal reveal-delay-2 warning-card card-hover bg-card rounded-xl p-5 border border-slate-700/60">
+                <div class="flex items-center gap-2 mb-3">
+                    <span class="text-accent-red text-lg">⚠️</span>
+                    <h4 class="text-white font-semibold text-sm">Ignoring Replication Lag</h4>
+                </div>
+                <p class="text-slate-400 text-xs leading-relaxed">Derived systems lag. If you write then immediately read from a derived view, you'll see stale data. Handle this explicitly.</p>
+                <div class="code-snippet mt-3 text-xs">
+                    <span class="comment">// Read-your-writes: go to SOR</span><br>
+                    <span class="keyword">if</span> (needsFreshData) {<br>
+                    &nbsp;&nbsp;<span class="fn">querySOR</span>(); <span class="comment">// not cache</span><br>
+                    }
+                </div>
+            </div>
+            <!-- Mistake 4 -->
+            <div class="reveal reveal-delay-3 warning-card card-hover bg-card rounded-xl p-5 border border-slate-700/60">
+                <div class="flex items-center gap-2 mb-3">
+                    <span class="text-accent-red text-lg">⚠️</span>
+                    <h4 class="text-white font-semibold text-sm">Schema Evolution Blindness</h4>
+                </div>
+                <p class="text-slate-400 text-xs leading-relaxed">Changing the SOR schema without updating derived consumers breaks pipelines. Plan for backward compatibility.</p>
+            </div>
+            <!-- Mistake 5 -->
+            <div class="reveal reveal-delay-4 warning-card card-hover bg-card rounded-xl p-5 border border-slate-700/60">
+                <div class="flex items-center gap-2 mb-3">
+                    <span class="text-accent-red text-lg">⚠️</span>
+                    <h4 class="text-white font-semibold text-sm">No Rebuild Strategy</h4>
+                </div>
+                <p class="text-slate-400 text-xs leading-relaxed">If a derived system corrupts, can you rebuild it from scratch? You must have a tested bootstrap process.</p>
+            </div>
+            <!-- Mistake 6 -->
+            <div class="reveal reveal-delay-5 warning-card card-hover bg-card rounded-xl p-5 border border-slate-700/60">
+                <div class="flex items-center gap-2 mb-3">
+                    <span class="text-accent-red text-lg">⚠️</span>
+                    <h4 class="text-white font-semibold text-sm">Over-Deriving</h4>
+                </div>
+                <p class="text-slate-400 text-xs leading-relaxed">Not every query needs a derived system. Start simple. Add a cache or index only when you measure a real bottleneck.</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- ==================== REAL-WORLD EXAMPLES ==================== -->
+    <section class="max-w-5xl mx-auto px-6 py-10">
+        <div class="reveal text-center mb-8">
+            <h2 class="text-3xl sm:text-4xl font-bold text-white">In the Wild</h2>
+            <p class="text-slate-400 mt-2 text-sm">How industry leaders apply this pattern</p>
+        </div>
+        <div class="grid sm:grid-cols-3 gap-5">
+            <div class="reveal card-hover bg-card rounded-xl p-5 border border-slate-700/60">
+                <div class="text-accent-blue text-2xl mb-3">🛒</div>
+                <h4 class="text-white font-semibold">E-Commerce</h4>
+                <p class="text-slate-400 text-xs mt-2 leading-relaxed"><strong>SOR:</strong> Orders DB (PostgreSQL). <strong>Derived:</strong> Product search (Elasticsearch), inventory cache (Redis), sales analytics (BigQuery).</p>
+            </div>
+            <div class="reveal reveal-delay-1 card-hover bg-card rounded-xl p-5 border border-slate-700/60">
+                <div class="text-accent-green text-2xl mb-3">🎬</div>
+                <h4 class="text-white font-semibold">Streaming (Netflix)</h4>
+                <p class="text-slate-400 text-xs mt-2 leading-relaxed"><strong>SOR:</strong> Content catalog DB. <strong>Derived:</strong> Search (Elasticsearch), recommendations model, user history cache.</p>
+            </div>
+            <div class="reveal reveal-delay-2 card-hover bg-card rounded-xl p-5 border border-slate-700/60">
+                <div class="text-accent-yellow text-2xl mb-3">🏦</div>
+                <h4 class="text-white font-semibold">Banking</h4>
+                <p class="text-slate-400 text-xs mt-2 leading-relaxed"><strong>SOR:</strong> Core ledger (mainframe/SQL). <strong>Derived:</strong> Statement PDFs, fraud detection pipeline, mobile app balance cache.</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- ==================== KEY TAKEAWAYS ==================== -->
+    <section class="max-w-5xl mx-auto px-6 py-10 pb-20">
+        <div class="reveal text-center mb-8">
+            <h2 class="text-3xl sm:text-4xl font-bold text-white">Key Takeaways</h2>
+            <p class="text-slate-400 mt-2 text-sm">Remember these principles</p>
+        </div>
+        <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div class="reveal card-hover bg-card rounded-xl p-5 border border-slate-700/60 text-center">
+                <div class="text-3xl mb-2">1️⃣</div>
+                <p class="text-white font-semibold text-sm">One Source of Truth</p>
+                <p class="text-slate-400 text-xs mt-1">The SOR is always right. Everything else is a copy.</p>
+            </div>
+            <div class="reveal reveal-delay-1 card-hover bg-card rounded-xl p-5 border border-slate-700/60 text-center">
+                <div class="text-3xl mb-2">2️⃣</div>
+                <p class="text-white font-semibold text-sm">Separate Reads &amp; Writes</p>
+                <p class="text-slate-400 text-xs mt-1">SOR for writes; derived systems for reads. Scale independently.</p>
+            </div>
+            <div class="reveal reveal-delay-2 card-hover bg-card rounded-xl p-5 border border-slate-700/60 text-center">
+                <div class="text-3xl mb-2">3️⃣</div>
+                <p class="text-white font-semibold text-sm">Embrace Eventual Consistency</p>
+                <p class="text-slate-400 text-xs mt-1">Derived data lags. Design for it. Don't fight it.</p>
+            </div>
+            <div class="reveal reveal-delay-3 card-hover bg-card rounded-xl p-5 border border-slate-700/60 text-center">
+                <div class="text-3xl mb-2">4️⃣</div>
+                <p class="text-white font-semibold text-sm">Use CDC, Not Dual Writes</p>
+                <p class="text-slate-400 text-xs mt-1">Let the database log be your event source. Avoid manual sync.</p>
+            </div>
+            <div class="reveal reveal-delay-4 card-hover bg-card rounded-xl p-5 border border-slate-700/60 text-center">
+                <div class="text-3xl mb-2">5️⃣</div>
+                <p class="text-white font-semibold text-sm">Always Be Rebuildable</p>
+                <p class="text-slate-400 text-xs mt-1">Derived systems are disposable. The SOR is sacred.</p>
+            </div>
+            <div class="reveal reveal-delay-5 card-hover bg-card rounded-xl p-5 border border-slate-700/60 text-center">
+                <div class="text-3xl mb-2">6️⃣</div>
+                <p class="text-white font-semibold text-sm">Start Simple</p>
+                <p class="text-slate-400 text-xs mt-1">Add derived systems only when you hit a real scaling bottleneck.</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- ==================== FOOTER ==================== -->
+    <footer class="max-w-5xl mx-auto px-6 py-8 border-t border-slate-800 text-center">
+        <p class="text-slate-600 text-xs">
+            Inspired by <span class="text-slate-500">ByteByteGo</span> · Architecture fundamentals for engineers
+        </p>
+    </footer>
+
+    <!-- ==================== SCROLL REVEAL SCRIPT ==================== -->
+    <script>
+        (function() {
+            const reveals = document.querySelectorAll('.reveal');
+            const observerOptions = {
+                root: null,
+                rootMargin: '0px 0px -60px 0px',
+                threshold: 0.1,
+            };
+
+            const observer = new IntersectionObserver((entries) => {
+                entries.forEach((entry) => {
+                    if (entry.isIntersecting) {
+                        entry.target.classList.add('visible');
+                        // Optionally unobserve after revealing
+                        // observer.unobserve(entry.target);
+                    }
+                });
+            }, observerOptions);
+
+            reveals.forEach((el) => observer.observe(el));
+
+            // Also handle the SVG animation for arrows — ensure they keep animating
+            // by re-triggering on visibility (they use CSS infinite animations, so this is fine)
+        })();
+    </script>
+</body>
+</html>
