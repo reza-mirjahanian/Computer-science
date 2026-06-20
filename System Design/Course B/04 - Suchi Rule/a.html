@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>The Sushi Principle in Data Engineering</title>
+  <style>
+    /* Variables & Reset */
+    :root {
+      --bg-color: #0f172a;
+      --card-bg: rgba(30, 41, 59, 0.7);
+      --card-border: rgba(56, 189, 248, 0.3);
+      --primary: #38bdf8; /* Cyan */
+      --accent: #f97316; /* Orange (Sushi/Salmon) */
+      --danger: #ef4444; /* Red (Cooked/Fire) */
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+    }
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+      color: var(--text-main);
+      margin: 0;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+    }
+    .container {
+      max-width: 1000px;
+      width: 100%;
+    }
+    
+    /* Header */
+    .header {
+      text-align: center;
+      margin-bottom: 40px;
+      animation: fadeInDown 1s ease;
+    }
+    .header h1 {
+      font-size: 2.5rem;
+      background: linear-gradient(90deg, var(--primary), var(--accent));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 10px;
+    }
+    .header p {
+      color: var(--text-muted);
+      font-size: 1.1rem;
+      max-width: 650px;
+      margin: 0 auto;
+      line-height: 1.6;
+    }
+
+    /* Grid Layout */
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 20px;
+      margin-bottom: 40px;
+    }
+    .card {
+      background: var(--card-bg);
+      backdrop-filter: blur(10px);
+      border: 1px solid var(--card-border);
+      border-radius: 16px;
+      padding: 24px;
+      transition: transform 0.3s ease, box-shadow 0.3s ease;
+      animation: fadeIn 1s ease;
+    }
+    .card:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 10px 30px -10px rgba(56, 189, 248, 0.3);
+    }
+    .card h2 {
+      font-size: 1.3rem;
+      margin-top: 0;
+      color: var(--primary);
+    }
+    .card p, .card li {
+      color: var(--text-muted);
+      line-height: 1.6;
+    }
+    .tag {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 20px;
+      font-size: 0.8rem;
+      font-weight: bold;
+      margin-bottom: 10px;
+    }
+    .tag-raw { background: rgba(56, 189, 248, 0.2); color: var(--primary); }
+    .tag-cooked { background: rgba(239, 68, 68, 0.2); color: var(--danger); }
+
+    /* Animations */
+    @keyframes fadeInDown {
+      from { opacity: 0; transform: translateY(-20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+    
+    /* Pipeline Section */
+    .pipeline-card {
+      background: var(--card-bg);
+      backdrop-filter: blur(10px);
+      border: 1px solid var(--card-border);
+      border-radius: 16px;
+      padding: 30px;
+      text-align: center;
+    }
+    .svg-container {
+      max-width: 800px;
+      margin: 0 auto;
+      background: radial-gradient(circle at center, rgba(56, 189, 248, 0.05) 0%, transparent 70%);
+      border-radius: 12px;
+      padding: 20px 0;
+    }
+    .data-node { fill: #334155; stroke: #94a3b8; stroke-width: 2; }
+    .data-node-raw { fill: #0c4a6e; stroke: #38bdf8; }
+    .data-node-cooked { fill: #7f1d1d; stroke: #ef4444; }
+
+    /* Comparison Section */
+    .comparison {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      margin-top: 40px;
+    }
+    .highlight { color: var(--accent); font-weight: bold; }
+    .highlight-red { color: var(--danger); font-weight: bold; }
+
+    @media (max-width: 768px) {
+      .comparison { grid-template-columns: 1fr; }
+      .header h1 { font-size: 2rem; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <div class="header">
+      <svg width="80" height="80" viewBox="0 0 100 100" style="margin-bottom: 15px;">
+        <ellipse cx="50" cy="30" rx="30" ry="10" fill="none" stroke="#38bdf8" stroke-width="3"/>
+        <path d="M 20 30 L 20 70 A 30 10 0 0 0 80 70 L 80 30" fill="none" stroke="#38bdf8" stroke-width="3"/>
+        <!-- Sushi Overlay -->
+        <path d="M 30 60 Q 50 40 70 60" fill="none" stroke="#f97316" stroke-width="4" stroke-linecap="round"/>
+        <circle cx="50" cy="65" r="5" fill="#f97316"/>
+        <circle cx="65" cy="60" r="4" fill="#f97316"/>
+        <circle cx="35" cy="60" r="4" fill="#f97316"/>
+      </svg>
+      <h1>The Sushi Principle</h1>
+      <p>In data engineering, <span class="highlight">raw data is better than cooked data.</span> Coined in 2015, this principle champions storing data in its original, unaltered state to preserve flexibility and maximum detail.</p>
+    </div>
+
+    <!-- What is it? -->
+    <div class="grid">
+      <div class="card">
+        <span class="tag tag-raw">RAW DATA</span>
+        <h2>🐟 The "Sushi" Approach</h2>
+        <p>Like sushi, which is prized for its pure, unaltered ingredients, raw data is kept exactly as it arrived from the <span class="highlight">"golden source."</span> It is not pre-aggregated, heavily filtered, or irreversibly transformed.</p>
+      </div>
+      <div class="card">
+        <span class="tag tag-cooked">COOKED DATA</span>
+        <h2>🍳 The "Cooked" Approach</h2>
+        <p>"Cooked" data undergoes heavy ETL upfront. Once you aggregate or filter data early in the pipeline, you "cook" it. You can't un-cook an egg, and you can't un-aggregate a pre-summed dataset to find the original details.</p>
+      </div>
+    </div>
+
+    <!-- Pipeline Animation Comparison -->
+    <div class="pipeline-card">
+      <h2 style="color: var(--primary); margin-bottom: 20px;">Pipeline Architecture: Schema-on-Read vs. Schema-on-Write</h2>
+      <div class="svg-container">
+        <svg viewBox="0 0 800 300" xmlns="http://www.w3.org/2000/svg">
+          <text x="50" y="40" fill="#38bdf8" font-size="18" font-weight="bold">Sushi Principle (ELT / Raw)</text>
+          <text x="50" y="190" fill="#ef4444" font-size="18" font-weight="bold">Cooked Approach (ETL / Pre-Processed)</text>
+
+          <!-- Raw Pipeline -->
+          <g transform="translate(0, 60)">
+            <rect x="50" y="20" width="100" height="60" rx="8" class="data-node data-node-raw"/>
+            <text x="100" y="55" fill="#fff" font-size="14" text-anchor="middle">Source</text>
+            <rect x="350" y="20" width="100" height="60" rx="8" class="data-node data-node-raw"/>
+            <text x="400" y="55" fill="#fff" font-size="14" text-anchor="middle">Data Lake</text>
+            <rect x="650" y="20" width="100" height="60" rx="8" class="data-node data-node-raw"/>
+            <text x="700" y="55" fill="#fff" font-size="14" text-anchor="middle">Consumers</text>
+
+            <path d="M 150 50 L 350 50" stroke="#38bdf8" stroke-width="3" stroke-dasharray="5,5"/>
+            <path d="M 450 50 L 650 50" stroke="#38bdf8" stroke-width="3" stroke-dasharray="5,5"/>
+
+            <rect x="150" y="45" width="20" height="10" fill="#f97316" rx="2">
+              <animateMotion dur="2s" repeatCount="indefinite" path="M 0 0 L 200 0" />
+            </rect>
+            <rect x="450" y="45" width="20" height="10" fill="#f97316" rx="2">
+              <animateMotion dur="2s" repeatCount="indefinite" path="M 0 0 L 200 0" />
+            </rect>
+            
+            <text x="250" y="15" fill="#94a3b8" font-size="12" text-anchor="middle">Load Raw (No Changes)</text>
+            <text x="550" y="15" fill="#94a3b8" font-size="12" text-anchor="middle">Transform on Read</text>
+          </g>
+
+          <!-- Cooked Pipeline -->
+          <g transform="translate(0, 210)">
+            <rect x="50" y="20" width="100" height="60" rx="8" class="data-node"/>
+            <text x="100" y="55" fill="#fff" font-size="14" text-anchor="middle">Source</text>
+            <rect x="250" y="20" width="100" height="60" rx="8" class="data-node data-node-cooked"/>
+            <text x="300" y="55" fill="#fff" font-size="14" text-anchor="middle">Transform</text>
+            <rect x="450" y="20" width="100" height="60" rx="8" class="data-node data-node-cooked"/>
+            <text x="500" y="55" fill="#fff" font-size="14" text-anchor="middle">Warehouse</text>
+            <rect x="650" y="20" width="100" height="60" rx="8" class="data-node"/>
+            <text x="700" y="55" fill="#fff" font-size="14" text-anchor="middle">Consumers</text>
+
+            <path d="M 150 50 L 250 50" stroke="#94a3b8" stroke-width="3" stroke-dasharray="5,5"/>
+            <path d="M 350 50 L 450 50" stroke="#ef4444" stroke-width="3"/>
+            <path d="M 550 50 L 650 50" stroke="#94a3b8" stroke-width="3" stroke-dasharray="5,5"/>
+
+            <!-- Data Packet turning red as it cooks -->
+            <rect x="150" y="45" width="20" height="10" fill="#f97316" rx="2">
+              <animateMotion dur="1.5s" repeatCount="indefinite" path="M 0 0 L 100 0" />
+              <animate attributeName="fill" values="#f97316;#ef4444" dur="1.5s" repeatCount="indefinite" />
+            </rect>
+            <rect x="350" y="45" width="20" height="10" fill="#ef4444" rx="2">
+              <animateMotion dur="1.5s" repeatCount="indefinite" path="M 0 0 L 100 0" />
+            </rect>
+            <rect x="550" y="45" width="20" height="10" fill="#ef4444" rx="2">
+              <animateMotion dur="1.5s" repeatCount="indefinite" path="M 0 0 L 100 0" />
+            </rect>
+            
+            <text x="200" y="15" fill="#94a3b8" font-size="12" text-anchor="middle">Extract</text>
+            <text x="300" y="95" fill="#ef4444" font-size="12" text-anchor="middle">Information is lost/filtered!</text>
+            <text x="400" y="15" fill="#94a3b8" font-size="12" text-anchor="middle">Load</text>
+          </g>
+        </svg>
+      </div>
+    </div>
+
+    <!-- Key Benefits & Considerations -->
+    <div class="comparison">
+      <div class="card">
+        <h2>✨ Why Raw is Better</h2>
+        <ul style="padding-left: 20px;">
+          <li><span class="highlight">Flexibility:</span> New questions arise over time. Raw data lets you re-process for new use cases.</li>
+          <li><span class="highlight">Traceability:</span> You can always audit exactly what happened at the source.</li>
+          <li><span class="highlight">Agility:</span> Don't waste time designing complex transformations before you even know what questions you need to answer.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h2>⚠️ The Catch (Data Swamps)</h2>
+        <p>While the Sushi Principle advocates for raw storage, dumping raw data without governance creates a <span class="highlight-red">"Data Swamp."</span> Raw data requires a strong <span class="highlight">"Schema-on-Read"</span> approach, solid metadata cataloging, and strict access controls to be truly useful.</p>
+      </div>
+    </div>
+
+    <div style="text-align: center; margin-top: 40px; color: var(--text-muted); font-size: 0.9rem;">
+      <p>Originally coined by Bobby Johnson & Joseph Adler at Strata+Hadoop World (2015).</p>
+    </div>
+  </div>
+</body>
+</html>
