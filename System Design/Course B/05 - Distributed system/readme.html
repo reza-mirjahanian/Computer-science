@@ -1,0 +1,733 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Distributed Systems & Nodes — ByteByteGo Style</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0F172A;
+    --bg-2:#111C34;
+    --card:#1E293B;
+    --card-2:#172036;
+    --line:#334155;
+    --blue:#3B82F6;
+    --cyan:#22D3EE;
+    --green:#10B981;
+    --yellow:#FACC15;
+    --red:#EF4444;
+    --text:#E2E8F0;
+    --muted:#94A3B8;
+  }
+  *{font-family:'Inter',system-ui,sans-serif;}
+  code, .mono{font-family:'JetBrains Mono',monospace;}
+  body{
+    background:
+      radial-gradient(1200px 600px at 10% -10%, rgba(59,130,246,.15), transparent 60%),
+      radial-gradient(900px 500px at 100% 10%, rgba(34,211,238,.12), transparent 60%),
+      var(--bg);
+    color:var(--text);
+    min-height:100vh;
+  }
+  .grid-bg{
+    background-image:
+      linear-gradient(rgba(148,163,184,.06) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(148,163,184,.06) 1px, transparent 1px);
+    background-size: 40px 40px;
+  }
+  .card{
+    background:linear-gradient(180deg, rgba(30,41,59,.9), rgba(23,32,54,.9));
+    border:1px solid var(--line);
+    border-radius:16px;
+    transition:transform .3s ease, border-color .3s ease, box-shadow .3s ease;
+  }
+  .card:hover{
+    transform:translateY(-4px);
+    border-color:#475569;
+    box-shadow:0 20px 40px -20px rgba(59,130,246,.35);
+  }
+  .chip{
+    display:inline-flex;align-items:center;gap:6px;
+    padding:4px 10px;border-radius:999px;
+    font-size:12px;font-weight:600;letter-spacing:.02em;
+    border:1px solid var(--line);
+    background:rgba(15,23,42,.6);
+  }
+  .glow-blue{box-shadow:0 0 0 1px rgba(59,130,246,.4), 0 0 30px rgba(59,130,246,.25);}
+  .glow-cyan{box-shadow:0 0 0 1px rgba(34,211,238,.4), 0 0 30px rgba(34,211,238,.25);}
+  .glow-green{box-shadow:0 0 0 1px rgba(16,185,129,.4), 0 0 30px rgba(16,185,129,.25);}
+  .glow-yellow{box-shadow:0 0 0 1px rgba(250,204,21,.4), 0 0 30px rgba(250,204,21,.25);}
+  .glow-red{box-shadow:0 0 0 1px rgba(239,68,68,.4), 0 0 30px rgba(239,68,68,.25);}
+
+  /* Reveal on scroll */
+  .reveal{opacity:0;transform:translateY(24px);transition:opacity .7s ease, transform .7s ease;}
+  .reveal.in{opacity:1;transform:translateY(0);}
+  .reveal.delay-1{transition-delay:.1s;}
+  .reveal.delay-2{transition-delay:.2s;}
+  .reveal.delay-3{transition-delay:.3s;}
+  .reveal.delay-4{transition-delay:.4s;}
+
+  /* Floating */
+  @keyframes float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-8px)} }
+  .float{animation:float 4s ease-in-out infinite;}
+  .float-slow{animation:float 6s ease-in-out infinite;}
+
+  /* Pulse dot */
+  @keyframes pulseDot{
+    0%{box-shadow:0 0 0 0 rgba(34,211,238,.7)}
+    70%{box-shadow:0 0 0 12px rgba(34,211,238,0)}
+    100%{box-shadow:0 0 0 0 rgba(34,211,238,0)}
+  }
+  .pulse-dot{animation:pulseDot 2s infinite;}
+
+  /* Dash animation for SVG arrows */
+  @keyframes dash {
+    to { stroke-dashoffset: -40; }
+  }
+  .flow-line{
+    stroke-dasharray: 6 6;
+    animation: dash 1.2s linear infinite;
+  }
+
+  /* Packet animation along path */
+  @keyframes packetMove {
+    0% { offset-distance: 0% }
+    100% { offset-distance: 100% }
+  }
+  .packet{
+    offset-path: path('M 80 180 L 260 180');
+    animation: packetMove 2s linear infinite;
+  }
+
+  /* Node heartbeat */
+  @keyframes beat {
+    0%,100%{transform:scale(1);opacity:1}
+    50%{transform:scale(1.08);opacity:.85}
+  }
+  .beat{animation:beat 2.4s ease-in-out infinite;transform-origin:center;}
+
+  /* Table */
+  table{border-collapse:separate;border-spacing:0;}
+  th,td{border-bottom:1px solid var(--line);padding:14px 16px;text-align:left;}
+  th{font-weight:700;color:#CBD5E1;background:rgba(15,23,42,.6);}
+  tr:hover td{background:rgba(59,130,246,.05);}
+
+  /* Code */
+  pre.code{
+    background:#0B1224;border:1px solid var(--line);border-radius:12px;
+    padding:16px;overflow:auto;font-size:13px;line-height:1.6;
+  }
+  .tok-k{color:#F472B6;}
+  .tok-s{color:#86EFAC;}
+  .tok-c{color:#64748B;font-style:italic;}
+  .tok-n{color:#FCD34D;}
+  .tok-f{color:#60A5FA;}
+
+  /* CAP triangle */
+  .cap-node{
+    position:absolute;width:14px;height:14px;border-radius:50%;
+    background:#22D3EE;box-shadow:0 0 0 4px rgba(34,211,238,.2);
+  }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar{width:10px;height:10px;}
+  ::-webkit-scrollbar-thumb{background:#334155;border-radius:10px;}
+  ::-webkit-scrollbar-track{background:transparent;}
+
+  @media (prefers-reduced-motion: reduce){
+    .reveal{opacity:1;transform:none;transition:none;}
+    .flow-line,.packet,.float,.float-slow,.beat,.pulse-dot{animation:none !important;}
+  }
+</style>
+</head>
+<body class="grid-bg">
+
+<!-- NAV -->
+<header class="max-w-7xl mx-auto px-6 pt-8 flex items-center justify-between">
+  <div class="flex items-center gap-3">
+    <div class="w-9 h-9 rounded-lg bg-gradient-to-br from-blue-500 to-cyan-400 flex items-center justify-center font-black text-slate-900">B</div>
+    <div>
+      <div class="font-extrabold tracking-tight">ByteByte<span class="text-cyan-400">Notes</span></div>
+      <div class="text-xs text-slate-400">Distributed Systems & Nodes</div>
+    </div>
+  </div>
+  <nav class="hidden md:flex gap-6 text-sm text-slate-300">
+    <a href="#what" class="hover:text-cyan-400">What</a>
+    <a href="#how" class="hover:text-cyan-400">How</a>
+    <a href="#arch" class="hover:text-cyan-400">Architecture</a>
+    <a href="#cap" class="hover:text-cyan-400">CAP</a>
+    <a href="#tradeoffs" class="hover:text-cyan-400">Trade-offs</a>
+    <a href="#mistakes" class="hover:text-cyan-400">Mistakes</a>
+    <a href="#takeaways" class="hover:text-cyan-400">Takeaways</a>
+  </nav>
+</header>
+
+<!-- HERO -->
+<section class="max-w-7xl mx-auto px-6 pt-16 pb-12">
+  <div class="grid lg:grid-cols-2 gap-10 items-center">
+    <div class="reveal">
+      <span class="chip glow-cyan"><span class="w-2 h-2 rounded-full bg-cyan-400 pulse-dot"></span> SYSTEM DESIGN · FUNDAMENTALS</span>
+      <h1 class="mt-5 text-5xl md:text-6xl font-black tracking-tight leading-[1.05]">
+        Distributed Systems <br/>
+        <span class="bg-gradient-to-r from-cyan-400 via-blue-400 to-green-400 bg-clip-text text-transparent">&amp; Nodes</span>
+      </h1>
+      <p class="mt-5 text-lg text-slate-300 max-w-xl">
+        A <span class="text-cyan-400 font-semibold">distributed system</span> is a collection of independent computers that appear to users as a single coherent system.
+        Each computer is a <span class="text-yellow-400 font-semibold">node</span>.
+      </p>
+      <div class="mt-6 flex flex-wrap gap-3">
+        <span class="chip"><span class="w-2 h-2 rounded-full bg-blue-400"></span> Scale out</span>
+        <span class="chip"><span class="w-2 h-2 rounded-full bg-green-400"></span> Fault tolerant</span>
+        <span class="chip"><span class="w-2 h-2 rounded-full bg-yellow-400"></span> Low latency</span>
+        <span class="chip"><span class="w-2 h-2 rounded-full bg-red-400"></span> Complex</span>
+      </div>
+    </div>
+
+    <!-- Hero SVG: Nodes cluster -->
+    <div class="reveal delay-2">
+      <div class="card p-6 relative overflow-hidden">
+        <div class="text-xs text-slate-400 mb-3 flex items-center justify-between">
+          <span>LIVE CLUSTER</span>
+          <span class="flex items-center gap-2 text-green-400"><span class="w-2 h-2 rounded-full bg-green-400 pulse-dot"></span> 5 nodes healthy</span>
+        </div>
+        <svg viewBox="0 0 480 320" class="w-full h-auto">
+          <defs>
+            <linearGradient id="nodeGrad" x1="0" x2="1">
+              <stop offset="0" stop-color="#22D3EE"/>
+              <stop offset="1" stop-color="#3B82F6"/>
+            </linearGradient>
+            <marker id="arrowBlue" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+              <path d="M0,0 L10,5 L0,10 z" fill="#3B82F6"/>
+            </marker>
+          </defs>
+
+          <!-- Client -->
+          <g class="float">
+            <rect x="20" y="130" width="90" height="60" rx="10" fill="#1E293B" stroke="#475569"/>
+            <text x="65" y="158" text-anchor="middle" fill="#E2E8F0" font-size="12" font-weight="700">Client</text>
+            <text x="65" y="176" text-anchor="middle" fill="#94A3B8" font-size="10">request</text>
+          </g>
+
+          <!-- Flow lines -->
+          <path d="M 115 160 L 200 160" stroke="#3B82F6" stroke-width="2" fill="none" class="flow-line" marker-end="url(#arrowBlue)"/>
+
+          <!-- Load balancer -->
+          <g>
+            <rect x="200" y="120" width="80" height="80" rx="12" fill="#0B1224" stroke="#FACC15" stroke-width="2"/>
+            <text x="240" y="155" text-anchor="middle" fill="#FACC15" font-size="11" font-weight="700">LB</text>
+            <text x="240" y="172" text-anchor="middle" fill="#94A3B8" font-size="9">router</text>
+          </g>
+
+          <!-- Fan-out lines to nodes -->
+          <path d="M 280 140 L 360 80"  stroke="#3B82F6" stroke-width="1.5" fill="none" class="flow-line"/>
+          <path d="M 280 160 L 360 160" stroke="#3B82F6" stroke-width="1.5" fill="none" class="flow-line"/>
+          <path d="M 280 180 L 360 240" stroke="#3B82F6" stroke-width="1.5" fill="none" class="flow-line"/>
+
+          <!-- Nodes -->
+          <g class="beat" style="animation-delay:0s">
+            <rect x="360" y="55" width="100" height="50" rx="10" fill="url(#nodeGrad)"/>
+            <text x="410" y="78" text-anchor="middle" fill="#0B1224" font-size="12" font-weight="800">Node 1</text>
+            <text x="410" y="93" text-anchor="middle" fill="#0B1224" font-size="9">us-east-1</text>
+          </g>
+          <g class="beat" style="animation-delay:.3s">
+            <rect x="360" y="135" width="100" height="50" rx="10" fill="url(#nodeGrad)"/>
+            <text x="410" y="158" text-anchor="middle" fill="#0B1224" font-size="12" font-weight="800">Node 2</text>
+            <text x="410" y="173" text-anchor="middle" fill="#0B1224" font-size="9">eu-west-1</text>
+          </g>
+          <g class="beat" style="animation-delay:.6s">
+            <rect x="360" y="215" width="100" height="50" rx="10" fill="url(#nodeGrad)"/>
+            <text x="410" y="238" text-anchor="middle" fill="#0B1224" font-size="12" font-weight="800">Node 3</text>
+            <text x="410" y="253" text-anchor="middle" fill="#0B1224" font-size="9">ap-south-1</text>
+          </g>
+
+          <!-- Packet -->
+          <circle r="4" fill="#22D3EE" class="packet"/>
+        </svg>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- WHAT -->
+<section id="what" class="max-w-7xl mx-auto px-6 py-16">
+  <div class="reveal">
+    <div class="chip glow-blue"><span class="w-2 h-2 rounded-full bg-blue-400"></span> 01 · THE PROBLEM</div>
+    <h2 class="mt-4 text-4xl md:text-5xl font-extrabold tracking-tight">Why not just one big computer?</h2>
+    <p class="mt-4 text-slate-300 max-w-3xl">A single machine has limits: CPU, memory, disk, network. When traffic grows, you either <span class="text-yellow-400 font-semibold">scale up</span> (bigger box) or <span class="text-cyan-400 font-semibold">scale out</span> (more boxes). Distributed systems choose the latter.</p>
+  </div>
+
+  <div class="mt-10 grid md:grid-cols-3 gap-6">
+    <div class="card p-6 reveal delay-1">
+      <div class="text-3xl">📈</div>
+      <h3 class="mt-3 font-bold text-lg">Scale</h3>
+      <p class="text-slate-400 mt-2 text-sm">Add nodes to handle more traffic. Horizontal scaling is cheaper and more flexible than buying a bigger server.</p>
+    </div>
+    <div class="card p-6 reveal delay-2">
+      <div class="text-3xl">🛡️</div>
+      <h3 class="mt-3 font-bold text-lg">Reliability</h3>
+      <p class="text-slate-400 mt-2 text-sm">No single point of failure. If one node dies, others keep serving. Users don't notice.</p>
+    </div>
+    <div class="card p-6 reveal delay-3">
+      <div class="text-3xl">⚡</div>
+      <h3 class="mt-3 font-bold text-lg">Latency</h3>
+      <p class="text-slate-400 mt-2 text-sm">Place nodes close to users around the world. A request from Tokyo shouldn't travel to Virginia.</p>
+    </div>
+  </div>
+</section>
+
+<!-- HOW IT WORKS -->
+<section id="how" class="max-w-7xl mx-auto px-6 py-16">
+  <div class="reveal">
+    <div class="chip glow-green"><span class="w-2 h-2 rounded-full bg-green-400"></span> 02 · HOW IT WORKS</div>
+    <h2 class="mt-4 text-4xl md:text-5xl font-extrabold tracking-tight">A request, step by step</h2>
+    <p class="mt-4 text-slate-300 max-w-3xl">Follow one user request as it travels through a distributed system.</p>
+  </div>
+
+  <div class="mt-10 grid md:grid-cols-2 lg:grid-cols-4 gap-5">
+    <div class="card p-6 reveal delay-1 relative">
+      <div class="absolute -top-3 -left-3 w-9 h-9 rounded-full bg-blue-500 text-slate-900 font-black flex items-center justify-center">1</div>
+      <div class="text-cyan-400 font-bold">Client → DNS</div>
+      <p class="text-slate-400 text-sm mt-2">User types <code class="text-yellow-300">api.app.com</code>. DNS returns the IP of a load balancer.</p>
+    </div>
+    <div class="card p-6 reveal delay-2 relative">
+      <div class="absolute -top-3 -left-3 w-9 h-9 rounded-full bg-blue-500 text-slate-900 font-black flex items-center justify-center">2</div>
+      <div class="text-cyan-400 font-bold">Load Balancer</div>
+      <p class="text-slate-400 text-sm mt-2">Picks a healthy node using round-robin, least-connections, or consistent hashing.</p>
+    </div>
+    <div class="card p-6 reveal delay-3 relative">
+      <div class="absolute -top-3 -left-3 w-9 h-9 rounded-full bg-green-500 text-slate-900 font-black flex items-center justify-center">3</div>
+      <div class="text-green-400 font-bold">Node processes</div>
+      <p class="text-slate-400 text-sm mt-2">The chosen node runs business logic, reads cache, queries DB, and builds a response.</p>
+    </div>
+    <div class="card p-6 reveal delay-4 relative">
+      <div class="absolute -top-3 -left-3 w-9 h-9 rounded-full bg-yellow-400 text-slate-900 font-black flex items-center justify-center">4</div>
+      <div class="text-yellow-400 font-bold">Replication</div>
+      <p class="text-slate-400 text-sm mt-2">Writes are replicated to peer nodes asynchronously for durability and read scaling.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ARCHITECTURE DIAGRAM -->
+<section id="arch" class="max-w-7xl mx-auto px-6 py-16">
+  <div class="reveal">
+    <div class="chip glow-cyan"><span class="w-2 h-2 rounded-full bg-cyan-400"></span> 03 · ARCHITECTURE</div>
+    <h2 class="mt-4 text-4xl md:text-5xl font-extrabold tracking-tight">A typical multi-tier distributed system</h2>
+    <p class="mt-4 text-slate-300 max-w-3xl">Clients, edge, compute, cache, storage — each layer can be scaled independently.</p>
+  </div>
+
+  <div class="mt-10 card p-6 md:p-10 reveal">
+    <svg viewBox="0 0 900 520" class="w-full h-auto">
+      <defs>
+        <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+          <path d="M0,0 L10,5 L0,10 z" fill="#3B82F6"/>
+        </marker>
+        <marker id="arrG" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+          <path d="M0,0 L10,5 L0,10 z" fill="#10B981"/>
+        </marker>
+        <marker id="arrY" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+          <path d="M0,0 L10,5 L0,10 z" fill="#FACC15"/>
+        </marker>
+        <linearGradient id="nodeG" x1="0" x2="1">
+          <stop offset="0" stop-color="#22D3EE"/>
+          <stop offset="1" stop-color="#3B82F6"/>
+        </linearGradient>
+        <linearGradient id="dbG" x1="0" x2="1">
+          <stop offset="0" stop-color="#FACC15"/>
+          <stop offset="1" stop-color="#F59E0B"/>
+        </linearGradient>
+        <linearGradient id="cacheG" x1="0" x2="1">
+          <stop offset="0" stop-color="#10B981"/>
+          <stop offset="1" stop-color="#059669"/>
+        </linearGradient>
+      </defs>
+
+      <!-- Layer labels -->
+      <text x="20" y="60" fill="#64748B" font-size="11" font-weight="700">EDGE</text>
+      <text x="20" y="180" fill="#64748B" font-size="11" font-weight="700">GATEWAY</text>
+      <text x="20" y="300" fill="#64748B" font-size="11" font-weight="700">COMPUTE</text>
+      <text x="20" y="420" fill="#64748B" font-size="11" font-weight="700">DATA</text>
+
+      <!-- Clients -->
+      <g>
+        <rect x="120" y="40" width="110" height="40" rx="8" fill="#1E293B" stroke="#475569"/>
+        <text x="175" y="65" text-anchor="middle" fill="#E2E8F0" font-size="12" font-weight="700">Web / Mobile</text>
+      </g>
+      <g>
+        <rect x="260" y="40" width="110" height="40" rx="8" fill="#1E293B" stroke="#475569"/>
+        <text x="315" y="65" text-anchor="middle" fill="#E2E8F0" font-size="12" font-weight="700">IoT Devices</text>
+      </g>
+      <g>
+        <rect x="400" y="40" width="110" height="40" rx="8" fill="#1E293B" stroke="#475569"/>
+        <text x="455" y="65" text-anchor="middle" fill="#E2E8F0" font-size="12" font-weight="700">3rd-party API</text>
+      </g>
+
+      <!-- CDN -->
+      <g class="float-slow">
+        <rect x="580" y="40" width="140" height="40" rx="8" fill="#0B1224" stroke="#22D3EE" stroke-width="2"/>
+        <text x="650" y="65" text-anchor="middle" fill="#22D3EE" font-size="12" font-weight="700">CDN / Edge Cache</text>
+      </g>
+
+      <!-- Arrows down to LB -->
+      <path d="M 175 80 L 175 140 L 430 140 L 430 170" stroke="#3B82F6" stroke-width="2" fill="none" class="flow-line" marker-end="url(#arr)"/>
+      <path d="M 315 80 L 315 140 L 450 140 L 450 170" stroke="#3B82F6" stroke-width="2" fill="none" class="flow-line" marker-end="url(#arr)"/>
+      <path d="M 455 80 L 455 170" stroke="#3B82F6" stroke-width="2" fill="none" class="flow-line" marker-end="url(#arr)"/>
+      <path d="M 650 80 L 650 140 L 470 140 L 470 170" stroke="#FACC15" stroke-width="2" fill="none" class="flow-line" marker-end="url(#arrY)"/>
+
+      <!-- Load Balancer -->
+      <g>
+        <rect x="380" y="170" width="180" height="60" rx="12" fill="#0B1224" stroke="#FACC15" stroke-width="2"/>
+        <text x="470" y="198" text-anchor="middle" fill="#FACC15" font-size="13" font-weight="800">Load Balancer</text>
+        <text x="470" y="215" text-anchor="middle" fill="#94A3B8" font-size="10">round-robin · health checks</text>
+      </g>
+
+      <!-- Fan-out to nodes -->
+      <path d="M 420 230 L 180 290" stroke="#3B82F6" stroke-width="2" fill="none" class="flow-line" marker-end="url(#arr)"/>
+      <path d="M 470 230 L 470 290" stroke="#3B82F6" stroke-width="2" fill="none" class="flow-line" marker-end="url(#arr)"/>
+      <path d="M 520 230 L 760 290" stroke="#3B82F6" stroke-width="2" fill="none" class="flow-line" marker-end="url(#arr)"/>
+
+      <!-- Compute nodes -->
+      <g class="beat">
+        <rect x="110" y="290" width="140" height="60" rx="10" fill="url(#nodeG)"/>
+        <text x="180" y="318" text-anchor="middle" fill="#0B1224" font-size="13" font-weight="800">Node A</text>
+        <text x="180" y="335" text-anchor="middle" fill="#0B1224" font-size="10">API service</text>
+      </g>
+      <g class="beat" style="animation-delay:.3s">
+        <rect x="400" y="290" width="140" height="60" rx="10" fill="url(#nodeG)"/>
+        <text x="470" y="318" text-anchor="middle" fill="#0B1224" font-size="13" font-weight="800">Node B</text>
+        <text x="470" y="335" text-anchor="middle" fill="#0B1224" font-size="10">API service</text>
+      </g>
+      <g class="beat" style="animation-delay:.6s">
+        <rect x="690" y="290" width="140" height="60" rx="10" fill="url(#nodeG)"/>
+        <text x="760" y="318" text-anchor="middle" fill="#0B1224" font-size="13" font-weight="800">Node C</text>
+        <text x="760" y="335" text-anchor="middle" fill="#0B1224" font-size="10">API service</text>
+      </g>
+
+      <!-- Node to cache -->
+      <path d="M 180 350 L 180 410" stroke="#10B981" stroke-width="2" fill="none" class="flow-line" marker-end="url(#arrG)"/>
+      <path d="M 470 350 L 470 410" stroke="#10B981" stroke-width="2" fill="none" class="flow-line" marker-end="url(#arrG)"/>
+      <path d="M 760 350 L 760 410" stroke="#10B981" stroke-width="2" fill="none" class="flow-line" marker-end="url(#arrG)"/>
+
+      <!-- Cache -->
+      <g>
+        <rect x="110" y="410" width="720" height="50" rx="10" fill="url(#cacheG)"/>
+        <text x="470" y="442" text-anchor="middle" fill="#0B1224" font-size="14" font-weight="800">Cache Cluster · Redis / Memcached</text>
+      </g>
+
+      <!-- Cache to DB -->
+      <path d="M 470 460 L 470 490" stroke="#FACC15" stroke-width="2" fill="none" class="flow-line" marker-end="url(#arrY)"/>
+
+      <!-- DB -->
+      <g>
+        <ellipse cx="470" cy="500" rx="150" ry="16" fill="url(#dbG)"/>
+        <text x="470" y="505" text-anchor="middle" fill="#0B1224" font-size="13" font-weight="800">Primary Database · PostgreSQL / MySQL</text>
+      </g>
+
+      <!-- Legend -->
+      <g transform="translate(720,470)">
+        <rect x="0" y="0" width="170" height="40" rx="8" fill="#0B1224" stroke="#334155"/>
+        <circle cx="14" cy="14" r="4" fill="#3B82F6"/><text x="24" y="18" fill="#CBD5E1" font-size="10">request</text>
+        <circle cx="14" cy="30" r="4" fill="#10B981"/><text x="24" y="34" fill="#CBD5E1" font-size="10">cache hit</text>
+        <circle cx="90" cy="14" r="4" fill="#FACC15"/><text x="100" y="18" fill="#CBD5E1" font-size="10">persist</text>
+        <circle cx="90" cy="30" r="4" fill="#EF4444"/><text x="100" y="34" fill="#CBD5E1" font-size="10">failure</text>
+      </g>
+    </svg>
+  </div>
+</section>
+
+<!-- CAP THEOREM -->
+<section id="cap" class="max-w-7xl mx-auto px-6 py-16">
+  <div class="reveal">
+    <div class="chip glow-yellow"><span class="w-2 h-2 rounded-full bg-yellow-400"></span> 04 · THE FUNDAMENTAL TRADE-OFF</div>
+    <h2 class="mt-4 text-4xl md:text-5xl font-extrabold tracking-tight">CAP Theorem</h2>
+    <p class="mt-4 text-slate-300 max-w-3xl">In a network partition, a distributed system can only guarantee <span class="font-bold text-cyan-400">two of three</span> properties.</p>
+  </div>
+
+  <div class="mt-10 grid lg:grid-cols-2 gap-8 items-center">
+    <!-- Triangle -->
+    <div class="reveal card p-8">
+      <svg viewBox="0 0 400 360" class="w-full h-auto">
+        <defs>
+          <linearGradient id="triGrad" x1="0" x2="1">
+            <stop offset="0" stop-color="#22D3EE" stop-opacity=".2"/>
+            <stop offset="1" stop-color="#3B82F6" stop-opacity=".05"/>
+          </linearGradient>
+        </defs>
+        <polygon points="200,40 40,320 360,320" fill="url(#triGrad)" stroke="#3B82F6" stroke-width="2"/>
+
+        <!-- C -->
+        <g>
+          <circle cx="200" cy="40" r="34" fill="#0B1224" stroke="#22D3EE" stroke-width="3"/>
+          <text x="200" y="46" text-anchor="middle" fill="#22D3EE" font-size="22" font-weight="800">C</text>
+          <text x="200" y="10" text-anchor="middle" fill="#CBD5E1" font-size="12" font-weight="700">Consistency</text>
+        </g>
+        <!-- A -->
+        <g>
+          <circle cx="40" cy="320" r="34" fill="#0B1224" stroke="#10B981" stroke-width="3"/>
+          <text x="40" y="326" text-anchor="middle" fill="#10B981" font-size="22" font-weight="800">A</text>
+          <text x="40" y="370" text-anchor="middle" fill="#CBD5E1" font-size="12" font-weight="700">Availability</text>
+        </g>
+        <!-- P -->
+        <g>
+          <circle cx="360" cy="320" r="34" fill="#0B1224" stroke="#FACC15" stroke-width="3"/>
+          <text x="360" y="326" text-anchor="middle" fill="#FACC15" font-size="22" font-weight="800">P</text>
+          <text x="360" y="370" text-anchor="middle" fill="#CBD5E1" font-size="12" font-weight="700">Partition tolerance</text>
+        </g>
+
+        <!-- Edges labels -->
+        <text x="100" y="170" fill="#94A3B8" font-size="11">every read returns latest write</text>
+        <text x="300" y="170" fill="#94A3B8" font-size="11" text-anchor="end">system responds even if nodes fail</text>
+        <text x="200" y="310" text-anchor="middle" fill="#94A3B8" font-size="11">works despite network splits</text>
+      </svg>
+    </div>
+
+    <!-- Choices -->
+    <div class="space-y-4 reveal delay-2">
+      <div class="card p-5 flex gap-4 items-start glow-cyan">
+        <div class="text-2xl">🏦</div>
+        <div>
+          <div class="font-bold">CP — Consistency + Partition</div>
+          <p class="text-slate-400 text-sm mt-1">Refuse to answer if data might be stale. Used in banks, payment systems, ZooKeeper, etcd, HBase.</p>
+        </div>
+      </div>
+      <div class="card p-5 flex gap-4 items-start glow-green">
+        <div class="text-2xl">🛒</div>
+        <div>
+          <div class="font-bold">AP — Availability + Partition</div>
+          <p class="text-slate-400 text-sm mt-1">Always answer, even with stale data. Used in shopping carts, social feeds, Cassandra, DynamoDB.</p>
+        </div>
+      </div>
+      <div class="card p-5 flex gap-4 items-start glow-yellow">
+        <div class="text-2xl">⚖️</div>
+        <div>
+          <div class="font-bold">CA — Consistency + Availability</div>
+          <p class="text-slate-400 text-sm mt-1">Only possible in a single-node system. Not realistic for distributed setups.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- TRADE-OFFS -->
+<section id="tradeoffs" class="max-w-7xl mx-auto px-6 py-16">
+  <div class="reveal">
+    <div class="chip glow-blue"><span class="w-2 h-2 rounded-full bg-blue-400"></span> 05 · TRADE-OFFS</div>
+    <h2 class="mt-4 text-4xl md:text-5xl font-extrabold tracking-tight">Monolith vs Distributed</h2>
+    <p class="mt-4 text-slate-300 max-w-3xl">Distributed systems are powerful — but they come with real costs. Choose deliberately.</p>
+  </div>
+
+  <div class="mt-10 card overflow-hidden reveal">
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="text-left">
+            <th class="w-1/3">Aspect</th>
+            <th>Monolith</th>
+            <th>Distributed</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="font-semibold">Deployment</td>
+            <td class="text-slate-300">One binary, easy</td>
+            <td class="text-cyan-400">Independent services, CI/CD per service</td>
+          </tr>
+          <tr>
+            <td class="font-semibold">Scaling</td>
+            <td class="text-slate-300">Vertical only</td>
+            <td class="text-cyan-400">Horizontal, per service</td>
+          </tr>
+          <tr>
+            <td class="font-semibold">Fault isolation</td>
+            <td class="text-red-400">One bug kills all</td>
+            <td class="text-green-400">Blast radius contained</td>
+          </tr>
+          <tr>
+            <td class="font-semibold">Debugging</td>
+            <td class="text-green-400">Simple stack traces</td>
+            <td class="text-red-400">Needs tracing, logs aggregation</td>
+          </tr>
+          <tr>
+            <td class="font-semibold">Data consistency</td>
+            <td class="text-green-400">ACID transactions</td>
+            <td class="text-yellow-400">Eventual consistency, sagas</td>
+          </tr>
+          <tr>
+            <td class="font-semibold">Network</td>
+            <td class="text-green-400">In-process calls</td>
+            <td class="text-red-400">Latency, retries, timeouts</td>
+          </tr>
+          <tr>
+            <td class="font-semibold">Team autonomy</td>
+            <td class="text-red-400">Shared codebase</td>
+            <td class="text-green-400">Teams own services</td>
+          </tr>
+          <tr>
+            <td class="font-semibold">Best for</td>
+            <td class="text-slate-300">Small teams, MVPs</td>
+            <td class="text-cyan-400">Large scale, complex domains</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Consensus algorithms comparison -->
+  <div class="mt-10 reveal">
+    <h3 class="text-2xl font-bold mb-4">Consensus algorithms compared</h3>
+    <div class="grid md:grid-cols-3 gap-5">
+      <div class="card p-6">
+        <div class="flex items-center justify-between">
+          <div class="font-bold text-lg">Paxos</div>
+          <span class="chip">Academic</span>
+        </div>
+        <p class="text-slate-400 text-sm mt-2">The original. Correct but hard to implement. Used in Chubby, Spanner.</p>
+        <div class="mt-3 text-xs text-slate-500">✓ Proven · ✗ Complex</div>
+      </div>
+      <div class="card p-6 glow-blue">
+        <div class="flex items-center justify-between">
+          <div class="font-bold text-lg">Raft</div>
+          <span class="chip glow-blue">Recommended</span>
+        </div>
+        <p class="text-slate-400 text-sm mt-2">Designed for understandability. Leader election + log replication. Used in etcd, Consul.</p>
+        <div class="mt-3 text-xs text-slate-500">✓ Simple · ✓ Popular</div>
+      </div>
+      <div class="card p-6">
+        <div class="flex items-center justify-between">
+          <div class="font-bold text-lg">PBFT / BFT</div>
+          <span class="chip">Byzantine</span>
+        </div>
+        <p class="text-slate-400 text-sm mt-2">Tolerates malicious nodes. Used in blockchains. Expensive: O(n²) messages.</p>
+        <div class="mt-3 text-xs text-slate-500">✓ Trustless · ✗ Slow</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- COMMON MISTAKES -->
+<section id="mistakes" class="max-w-7xl mx-auto px-6 py-16">
+  <div class="reveal">
+    <div class="chip glow-red"><span class="w-2 h-2 rounded-full bg-red-400"></span> 06 · COMMON MISTAKES</div>
+    <h2 class="mt-4 text-4xl md:text-5xl font-extrabold tracking-tight">What breaks in production</h2>
+    <p class="mt-4 text-slate-300 max-w-3xl">Distributed systems fail in subtle ways. Here are the anti-patterns that bite engineers the most.</p>
+  </div>
+
+  <div class="mt-10 grid md:grid-cols-2 gap-5">
+    <div class="card p-6 reveal delay-1 border-red-500/30">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-lg bg-red-500/20 flex items-center justify-center text-red-400 text-xl">⚠️</div>
+        <div class="font-bold">Treating the network as reliable</div>
+      </div>
+      <p class="text-slate-400 text-sm mt-3">Networks drop packets, partitions happen, nodes die. <span class="text-red-400 font-semibold">Always</span> set timeouts, retries with backoff, and circuit breakers.</p>
+<pre class="code mt-3"><span class="tok-c">// Go: retry with exponential backoff</span>
+<span class="tok-k">for</span> i := <span class="tok-n">0</span>; i &lt; <span class="tok-n">3</span>; i++ {
+  err := <span class="tok-f">call</span>(ctx)
+  <span class="tok-k">if</span> err == <span class="tok-k">nil</span> { <span class="tok-k">return</span> <span class="tok-k">nil</span> }
+  <span class="tok-f">sleep</span>(<span class="tok-f">backoff</span>(i))
+}</pre>
+    </div>
+
+    <div class="card p-6 reveal delay-2 border-red-500/30">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-lg bg-red-500/20 flex items-center justify-center text-red-400 text-xl">⏱️</div>
+        <div class="font-bold">Ignoring clock skew</div>
+      </div>
+      <p class="text-slate-400 text-sm mt-3">Nodes disagree on time. Don't use <code class="text-yellow-300">Date.now()</code> for ordering across nodes. Use <span class="text-cyan-400 font-semibold">Lamport clocks</span>, <span class="text-cyan-400 font-semibold">Hybrid Logical Clocks</span>, or logical IDs.</p>
+    </div>
+
+    <div class="card p-6 reveal delay-3 border-red-500/30">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-lg bg-red-500/20 flex items-center justify-center text-red-400 text-xl">🔁</div>
+        <div class="font-bold">Non-idempotent writes</div>
+      </div>
+      <p class="text-slate-400 text-sm mt-3">Retries on timeouts can double-charge users. Make every write idempotent with a request ID or use <span class="text-cyan-400 font-semibold">idempotency keys</span>.</p>
+<pre class="code mt-3"><span class="tok-c">// HTTP header</span>
+Idempotency-Key: <span class="tok-s">"req_8f3a2b"</span>
+<span class="tok-c">// Server returns same response on retry</span></pre>
+    </div>
+
+    <div class="card p-6 reveal delay-4 border-red-500/30">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-lg bg-red-500/20 flex items-center justify-center text-red-400 text-xl">🧩</div>
+        <div class="font-bold">Distributed transactions</div>
+      </div>
+      <p class="text-slate-400 text-sm mt-3">Two-phase commit blocks the system. Prefer the <span class="text-cyan-400 font-semibold">Saga pattern</span>: a sequence of local transactions with compensating actions.</p>
+    </div>
+
+    <div class="card p-6 reveal delay-1 border-red-500/30">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-lg bg-red-500/20 flex items-center justify-center text-red-400 text-xl">🔍</div>
+        <div class="font-bold">No observability</div>
+      </div>
+      <p class="text-slate-400 text-sm mt-3">Without traces, metrics, and logs, debugging is a guessing game. Instrument every hop with a <span class="text-cyan-400 font-semibold">correlation ID</span>.</p>
+    </div>
+
+    <div class="card p-6 reveal delay-2 border-red-500/30">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-lg bg-red-500/20 flex items-center justify-center text-red-400 text-xl">📦</div>
+        <div class="font-bold">Premature microservices</div>
+      </div>
+      <p class="text-slate-400 text-sm mt-3">Start monolithic. Split only when you have clear bounded contexts and real scaling pressure. Complexity is a cost.</p>
+    </div>
+  </div>
+</section>
+
+<!-- KEY TAKEAWAYS -->
+<section id="takeaways" class="max-w-7xl mx-auto px-6 py-16">
+  <div class="reveal">
+    <div class="chip glow-green"><span class="w-2 h-2 rounded-full bg-green-400"></span> 07 · KEY TAKEAWAYS</div>
+    <h2 class="mt-4 text-4xl md:text-5xl font-extrabold tracking-tight">10 lessons to remember</h2>
+  </div>
+
+  <div class="mt-10 grid md:grid-cols-2 lg:grid-cols-3 gap-5">
+    <div class="card p-6 reveal delay-1"><div class="text-3xl font-black text-cyan-400">01</div><p class="mt-2 text-slate-300 text-sm">A <span class="text-cyan-400 font-semibold">node</span> is any independent machine in the system — server, container, or process.</p></div>
+    <div class="card p-6 reveal delay-2"><div class="text-3xl font-black text-cyan-400">02</div><p class="mt-2 text-slate-300 text-sm">Scale <span class="text-green-400 font-semibold">horizontally</span> by adding nodes, not by buying bigger hardware.</p></div>
+    <div class="card p-6 reveal delay-3"><div class="text-3xl font-black text-cyan-400">03</div><p class="mt-2 text-slate-300 text-sm">CAP theorem is real: pick <span class="text-yellow-400 font-semibold">CP or AP</span> based on your business, not on hype.</p></div>
+    <div class="card p-6 reveal delay-1"><div class="text-3xl font-black text-cyan-400">04</div><p class="mt-2 text-slate-300 text-sm">Assume the network <span class="text-red-400 font-semibold">will fail</span>. Timeouts, retries, and circuit breakers are mandatory.</p></div>
+    <div class="card p-6 reveal delay-2"><div class="text-3xl font-black text-cyan-400">05</div><p class="mt-2 text-slate-300 text-sm">Use <span class="text-cyan-400 font-semibold">load balancers</span> and health checks to route traffic away from bad nodes.</p></div>
+    <div class="card p-6 reveal delay-3"><div class="text-3xl font-black text-cyan-400">06</div><p class="mt-2 text-slate-300 text-sm">Cache aggressively (Redis), but design for <span class="text-yellow-400 font-semibold">cache invalidation</span> from day one.</p></div>
+    <div class="card p-6 reveal delay-1"><div class="text-3xl font-black text-cyan-400">07</div><p class="mt-2 text-slate-300 text-sm">Prefer <span class="text-cyan-400 font-semibold">eventual consistency</span> where possible; it unlocks massive scale.</p></div>
+    <div class="card p-6 reveal delay-2"><div class="text-3xl font-black text-cyan-400">08</div><p class="mt-2 text-slate-300 text-sm">Make every write <span class="text-green-400 font-semibold">idempotent</span> — retries should be safe.</p></div>
+    <div class="card p-6 reveal delay-3"><div class="text-3xl font-black text-cyan-400">09</div><p class="mt-2 text-slate-300 text-sm">Invest in <span class="text-cyan-400 font-semibold">observability</span>: distributed tracing, structured logs, SLOs.</p></div>
+    <div class="card p-6 reveal delay-1 md:col-span-2 lg:col-span-3 bg-gradient-to-r from-blue-500/10 to-cyan-500/10 border-cyan-500/30">
+      <div class="text-3xl font-black text-cyan-400">10</div>
+      <p class="mt-2 text-slate-200">Simplicity wins. Start with a monolith, split only when you <span class="text-cyan-400 font-semibold">feel the pain</span>, and measure every decision.</p>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer class="max-w-7xl mx-auto px-6 py-12 border-t border-slate-800 mt-10">
+  <div class="flex flex-col md:flex-row items-center justify-between gap-4">
+    <div class="flex items-center gap-3">
+      <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-cyan-400 flex items-center justify-center font-black text-slate-900">B</div>
+      <div class="text-sm text-slate-400">ByteByteNotes · Distributed Systems & Nodes</div>
+    </div>
+    <div class="text-xs text-slate-500">Built for engineers who like their diagrams clean and their explanations short.</div>
+  </div>
+</footer>
+
+<script>
+  // Reveal on scroll
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        e.target.classList.add('in');
+        io.unobserve(e.target);
+      }
+    });
+  }, { threshold: 0.12 });
+  document.querySelectorAll('.reveal').forEach(el => io.observe(el));
+
+  // Smooth anchor scroll
+  document.querySelectorAll('a[href^="#"]').forEach(a => {
+    a.addEventListener('click', (e) => {
+      const id = a.getAttribute('href');
+      const el = document.querySelector(id);
+      if (el) { e.preventDefault(); el.scrollIntoView({ behavior:'smooth', block:'start' }); }
+    });
+  });
+</script>
+</body>
+</html>
